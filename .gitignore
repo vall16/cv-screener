@@ -1,0 +1,36 @@
+# ── opencode ────────────────────────────────────────────
+.opencode/node_modules/
+.opencode/package-lock.json
+
+# ── Python / backend ────────────────────────────────────
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# ── Node / frontend ─────────────────────────────────────
+node_modules/
+frontend/.angular/
+frontend/dist/
+npm-debug.log*
+
+# ── Log ─────────────────────────────────────────────────
+*.log
+*.log.err
+*.log.out
+
+# ── CV reali e report generati (contengono dati personali) ──
+CVs/*
+!CVs/COME-USARE.txt
+!CVs/sample-anna.txt
+CVs/_report/
+
+# ── Editor / OS ─────────────────────────────────────────
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

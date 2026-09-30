@@ -1,0 +1,178 @@
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">CV</span>
+    <div>
+      <strong>CV Screener</strong>
+      <small>selezione profili con opencode</small>
+    </div>
+  </div>
+  <nav class="tabs">
+    <button [class.active]="step === 'upload'" (click)="go('upload')">1 · CV</button>
+    <button [class.active]="step === 'run'" (click)="go('run')">2 · Screening</button>
+    <button [class.active]="step === 'results'" (click)="go('results')">3 · Risultati</button>
+  </nav>
+</header>
+
+<main class="wrap">
+
+  @if (uploadError) {
+    <div class="banner error">{{ uploadError }}</div>
+  }
+
+  <!-- ─── 1 · CV ─────────────────────────────────── -->
+  @if (step === 'upload') {
+    <section class="card">
+      <h2>Carica i curriculum</h2>
+      <p class="muted">Formati supportati: PDF e TXT. Puoi selezionare più file contemporaneamente.</p>
+
+      <div class="dropzone">
+        <input id="files" type="file" multiple accept=".pdf,.txt" (change)="onFilesSelected($event)" />
+        <label for="files">
+          <span class="big">Clicca per scegliere i CV</span>
+          <span class="muted">oppure trascinali qui</span>
+        </label>
+      </div>
+
+      @if (selectedFiles.length) {
+        <div class="row">
+          <span>{{ selectedFiles.length }} file selezionato/i</span>
+          <button class="primary" (click)="upload()" [disabled]="uploading">
+            {{ uploading ? 'Caricamento…' : 'Carica i CV' }}
+          </button>
+        </div>
+      }
+
+      @for (e of uploadErrors; track e) {
+        <div class="banner error">{{ e }}</div>
+      }
+
+      <h3>CV presenti ({{ cvs.length }})</h3>
+      @if (cvs.length === 0) {
+        <p class="muted">Nessun CV caricato.</p>
+      }
+      <ul class="cvs">
+        @for (c of cvs; track c) {
+          <li>
+            <span class="file">{{ c }}</span>
+            <button class="ghost danger" (click)="deleteCv(c)">elimina</button>
+          </li>
+        }
+      </ul>
+
+      @if (cvs.length > 0) {
+        <div class="row end">
+          <button class="primary" (click)="go('run')">Continua → Profilo e screening</button>
+        </div>
+      }
+    </section>
+  }
+
+  <!-- ─── 2 · Screening ──────────────────────────── -->
+  @if (step === 'run') {
+    <section class="card">
+      <h2>Avvia lo screening</h2>
+
+      <label class="field">
+        <span>Profilo target</span>
+        <input [(ngModel)]="profile" (keyup.enter)="start()" placeholder="es. senior backend developer" />
+      </label>
+
+      <div class="row">
+        <button class="primary" (click)="start()" [disabled]="job?.status === 'running' || cvs.length === 0">
+          {{ job?.status === 'running' ? 'Screening in corso…' : 'Avvia screening' }}
+        </button>
+        @if (cvs.length === 0) {
+          <span class="muted">Carica prima almeno un CV (passo 1).</span>
+        }
+      </div>
+
+      @if (job) {
+        <div class="job" [class.done]="job.status === 'done'" [class.error]="job.status === 'error'">
+          <div class="job-head">
+            <span class="pill" [class]="job.status">
+              {{ statusLabel(job) }}
+            </span>
+            <span class="muted">#{{ job.id }}</span>
+            <span class="muted">{{ job.profile }}</span>
+          </div>
+
+          @if (job.error) {
+            <div class="banner error">{{ job.error }}</div>
+          }
+
+          <div class="log">
+            @if (job.output.length === 0) {
+              <span class="muted">Attendo l'avvio di opencode…</span>
+            }
+            @for (line of job.output.slice(-60); track $index) {
+              <div class="log-line">{{ line }}</div>
+            }
+          </div>
+
+          @if (job.status === 'done') {
+            <div class="row end">
+              <button class="primary" (click)="go('results')">Vai ai risultati →</button>
+            </div>
+          }
+        </div>
+      }
+
+      @if (history.length > 1) {
+        <h3>Screening precedenti</h3>
+        <ul class="cvs">
+          @for (j of history.slice(1); track j.id) {
+            <li>
+              <span class="file">{{ j.profile }}</span>
+              <span class="pill" [class]="j.status">{{ statusLabel(j) }}</span>
+              <button class="ghost" (click)="openJob(j)">apri</button>
+            </li>
+          }
+        </ul>
+      }
+    </section>
+  }
+
+  <!-- ─── 3 · Risultati ──────────────────────────── -->
+  @if (step === 'results') {
+    <section class="results">
+      <aside class="card">
+        <h2>Report</h2>
+        @if (reports.length === 0) {
+          <p class="muted">Nessun report ancora. Completa uno screening al passo 2.</p>
+        }
+        <ul class="reports">
+          @for (r of reports; track r) {
+            <li>
+              <button
+                class="report-item"
+                [class.active]="r === activeReport"
+                [class.classifica]="isClassifica(r)"
+                (click)="openReport(r)"
+              >
+                @if (isClassifica(r)) {
+                  <span>★</span>
+                }
+                <span>{{ r }}</span>
+              </button>
+            </li>
+          }
+        </ul>
+      </aside>
+
+      <div class="card viewer">
+        @if (loadingReport) {
+          <p class="muted">Caricamento…</p>
+        } @else if (activeHtml) {
+          <article [innerHTML]="activeHtml"></article>
+        } @else {
+          <p class="muted">Seleziona un report a sinistra.</p>
+        }
+      </div>
+    </section>
+  }
+
+</main>
+
+<footer class="foot">
+  cv-screener · backend Python (FastAPI) + frontend Angular · esegue opencode con l'agente hr-recruiter
+</footer>

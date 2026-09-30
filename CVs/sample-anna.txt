@@ -1,0 +1,3 @@
+﻿ANNA ROSSI
+Data Engineer 
+5 anni di esperienza in data engineering. Python, SQL, Spark, Airflow, AWS. Ha lavorato a pipeline ETL per una banca. Laureata in Ingegneria Informatica.

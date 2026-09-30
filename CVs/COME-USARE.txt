@@ -1,0 +1,3 @@
+Metti qui i CV da analizzare (formati PDF o TXT).
+
+Dopo lo screening troverai i report e la classifica nella sottocartella _report.
