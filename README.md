@@ -5,7 +5,7 @@ recruiter li legge tutti e produce una **classifica motivata** — report per ca
 tabella comparativa, top 3 e scartati con motivo.
 
 Non è una SaaS: gira tutto in locale sulla tua macchina. Nessun dato esce dal computer,
-i CV restano in una cartella e i report vengono scritti su file. prova
+i CV restano in una cartella e i report vengono scritti su file. provaa
 
 ## Come funziona
 
