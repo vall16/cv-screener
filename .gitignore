@@ -22,9 +22,10 @@ npm-debug.log*
 *.log.out
 
 # ── CV reali e report generati (contengono dati personali) ──
+# Vengono committati solo i sample fittizi (sample-*.txt).
 CVs/*
 !CVs/COME-USARE.txt
-!CVs/sample-anna.txt
+!CVs/sample-*.txt
 CVs/_report/
 
 # ── Editor / OS ─────────────────────────────────────────

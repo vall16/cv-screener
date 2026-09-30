@@ -1,0 +1,47 @@
+ANDREA GRECO
+Backend Developer
+============================================================
+
+CONTATTI
+Email: andrea.greco@example.com
+Sede: Palermo, Italia
+
+PROFILO
+Sviluppatore backend con 4 anni di esperienza. Python e
+REST. Collaborazione con team di prodotto su progetti
+web.
+
+ESPERIENZA
+
+2022 - oggi · Sviluppo software
+Backend Developer
+  - Sviluppo e manutenzione di applicazioni web.
+  - Realizzazione di API REST in Python e gestione del
+    database.
+  - Lavoro in team con designer e product manager.
+
+2020 - 2022 · Software house
+Sviluppatore full-stack
+  - Sviluppo di applicazioni per clienti, dal frontend al
+    backend.
+  - Attivita di manutenzione e correzione di bug.
+
+2018 - 2020 · Primo impiego
+Sviluppatore
+  - Realizzazione di siti web e piccoli gestionali.
+
+COMPETENZE
+Linguaggi:      Python, JavaScript, SQL
+Backend:        REST, Django (base), Flask (base)
+Dati:           MySQL, PostgreSQL (base)
+Cloud/DevOps:   esperienza limitata
+
+FORMAZIONE
+2015 - 2018 · Laurea in Informatica, Universita di Palermo.
+         Voto 80/110.
+
+LINGUE
+Italiano: madrelingua. Inglese: B1.
+
+NOTE
+Disponibilita: da concordare. Sede: Palermo.

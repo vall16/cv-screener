@@ -1,0 +1,65 @@
+GIULIA FONTANA
+Backend Developer
+============================================================
+
+CONTATTI
+Email: giulia.fontana@example.com
+Telefono: +39 347 881 2290
+LinkedIn: linkedin.com/in/giuliafontana
+Sede: Bologna, Italia
+
+PROFILO
+Backend developer con 6 anni di esperienza in applicazioni
+e-commerce e gestione ordini. Buona padronanza di Python e
+Django, meno exposure agli ambienti cloud distribuiti.
+
+ESPERIENZA
+
+2022 - oggi · Eolo Retail S.r.l. (e-commerce, 95 dipendenti)
+Backend Developer
+  - Manutenzione e sviluppo del monolith Django del gestionale
+    ordini: 60.000 ordini/mese nel picco (Black Friday).
+  - Scritte 180 endpoint REST con Django REST Framework,
+    coperti da test (pytest, 82% di copertura).
+  - Gestione della migrazione da jQuery a Angular per la
+    area cliente (lato server: API di supporto).
+  - Risoluzione di un incidente di out-of-memory su Celery
+    che bloccava i job di notte (root cause: leak in un
+    consumer di lunga durata).
+
+2019 - 2022 · StartUp Srl (B2B SaaS, 22 dipendenti)
+Backend Developer
+  - Sviluppo dell'API REST e dei webhook di integrazione
+    (Python + Django + PostgreSQL).
+  - Implementazione dell'autenticazione OAuth2 e dei ruoli.
+  - Primi container Docker in produzione (2 servizi), senza
+    orchestrazione: gestione dei deploy ancora manuale.
+
+2017 - 2019 · Tirocinio e primi impegni · Studioassociato
+Junior Developer
+  - Sviluppo di siti vetrina in PHP e WordPress.
+  - Automazione di report Excel in VBA per uno studio
+    commerciale.
+
+COMPETENZE
+Linguaggi:      Python, JavaScript, SQL, PHP (base)
+Backend:        Django, DRF, Flask (base), REST
+Dati:           PostgreSQL, MySQL, Redis (base)
+Cloud/DevOps:   Docker (base), AWS EC2/RDS/S3 (base),
+                no esperienza Kubernetes
+Testing:        pytest, unittest, integration test
+
+FORMAZIONE
+2016 - 2019 · Laurea in Ingegneria Informatica, Universita
+         di Bologna. Voto 88/110.
+
+CERTIFICAZIONI
+  - AWS Certified Cloud Practitioner (2024)
+
+LINGUE
+Italiano: madrelingua. Inglese: B2 (scritto parlato).
+
+NOTE
+Disponibilita: immediata. Sede: Bologna, ricerca ibrido o
+da remoto. Attualmente in corsia di formazione per
+Certified Kubernetes Application Developer.

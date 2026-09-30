@@ -1,0 +1,66 @@
+CHIARA ESPOSITO
+DevOps / SRE Engineer
+============================================================
+
+CONTATTI
+Email: chiara.esposito@example.com
+Telefono: +39 342 118 5567
+LinkedIn: linkedin.com/in/chiaraesposito-sre
+GitHub: github.com/cesposito
+Sede: Torino, Italia
+
+PROFILO
+DevOps/SRE engineer con 6 anni di esperienza. Specialista di
+infrastruttura, Kubernetes e osservabilita. Scrive codice
+Python per tooling e automazione, ma non sviluppa
+applicazioni.
+
+ESPERIENZA
+
+2022 - oggi · Cloud Factory S.p.A. (managed services, 120 dipendenti)
+Site Reliability Engineer
+  - Gestione di cluster Kubernetes multi-tenant (9 ambienti
+    di produzione) con Terraform e Helm.
+  - Riduzione del MTTR del 58% (da 52 a 22 minuti)
+    tramite runbook e alert mirati.
+  - Implementazione di observability stack: Prometheus,
+    Grafana, Loki, Jaeger.
+  - Tooling interno in Python (CLI e API FastAPI per la
+    gestione degli ambienti, usata da 30 sviluppatori).
+  - On-call e revisione delle design review di architettura.
+
+2019 - 2022 · Internet Provider (ISP)
+DevOps Engineer
+  - Automatizzazione del provisioning delle VM con Python
+    e Ansible.
+  - Gestione della rete e del DNS su core DNSSEC.
+  - Backup e disaster recovery.
+
+2017 - 2019 · Sysadmin · Piccola azienda locale
+Amministratore di sistema
+  - Gestione server Linux, backup, aggiornamenti.
+  - Primi script di automazione in Bash e Python.
+
+COMPETENZE
+Linguaggi:      Python (tooling), Bash, Go (base), YAML
+Infra:          Kubernetes, Terraform, Helm, Docker,
+                AWS (EC2, EKS, RDS, S3), Ansible
+Observability:  Prometheus, Grafana, Loki, Jaeger, Datadog
+Networking:     DNS, TCP/IP, load balancing, BGP (base)
+Backend/API:    FastAPI (solo per il tooling interno)
+
+FORMAZIONE
+2014 - 2017 · Laurea in Ingegneria Informatica, Politecnico
+         di Torino. Voto 90/110.
+
+CERTIFICAZIONI
+  - CKA: Certified Kubernetes Administrator (2023)
+  - AWS Certified Solutions Architect - Associate (2022)
+  - Terraform Associate (2022)
+
+LINGUE
+Italiano: madrelingua. Inglese: C1. Inglese tecnico: madrelingua.
+
+NOTE
+Disponibilita: 1 mese. Sede: Torino, da remoto possibile.
+Interessata anche al ruolo di Platform Engineer.

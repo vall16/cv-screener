@@ -1,0 +1,49 @@
+DAVIDE GALLO
+Backend Developer
+============================================================
+
+CONTATTI
+Email: davide.gallo@example.com
+Telefono: +39 333 220 1188
+Sede: Napoli, Italia
+
+PROFILO
+Backend developer junior con 2 anni di esperienza. Stack
+Java e Spring. Formazione in corso su Python.
+
+ESPERIENZA
+
+2024 - oggi · Software House "Kube solutions"
+Backend Developer Junior
+  - Sviluppo di REST API in Java 17 con Spring Boot per
+    gestionale assicurativo.
+  - Scrittura di test JUnit (55% di copertura).
+  - Lavoro su PostgreSQL e code RabbitMQ.
+
+2023 - 2024 · Stage formativo · Software House "Kube solutions"
+Sviluppatore
+  - Realizzazione di CRUD in Spring Boot.
+  - Containerizzazione con Docker dei servizi sviluppati.
+
+COMPETENZE
+Linguaggi:      Java, SQL, JavaScript (base)
+Backend:        Spring Boot, Spring MVC, JPA, REST
+Dati:           PostgreSQL, MySQL
+Cloud/DevOps:   Docker (base), nessun esperienza cloud,
+                nessun Kubernetes
+Altro:          Corso Python in corso (100 ore, 60% completato)
+
+FORMAZIONE
+2020 - 2023 · Laurea triennale in Ingegneria Informatica,
+         Universita Federico II, Napoli. Voto 78/110.
+
+CERTIFAZIONI
+  - Nessuna.
+
+LINGUE
+Italiano: madrelingua. Inglese: B1.
+
+NOTE
+Disponibilita: immediata. Sede: Napoli, ibrido. Valuta
+trasferimento se l'azienda e in sede a Milano o da remoto
+full remote.

@@ -1,0 +1,62 @@
+LUCA MORETTI
+Full-stack Developer
+============================================================
+
+CONTATTI
+Email: luca.moretti@example.com
+Telefono: +39 320 774 3391
+LinkedIn: linkedin.com/in/luca-moretti-dev
+Sede: Torino, Italia
+
+PROFILO
+Full-stack developer JavaScript con 5 anni di esperienza.
+Specializzazione primaria in Node.js e React. Esperienza
+Python limitata a script e job batch interni.
+
+ESPERIENZA
+
+2022 - oggi · MediaHouse S.r.l. (media digitale, 40 dipendenti)
+Full-stack Developer
+  - Sviluppo di un CMS e della piattaforma video in Node.js,
+    Express, React e PostgreSQL.
+  - Implementazione del player video con streaming HLS e
+    sottotitoli (FFmpeg, worker in Node).
+  - Ottimizzazione del bundle frontend: da 3.2 MB a 780 KB
+    con code splitting e lazy loading.
+  - GraphQL: definizione dello schema e resolver per aggregare
+    dati da 3 fonti eterogenee.
+
+2019 - 2022 · Digital Agency "Pixel&Co"
+Full-stack Developer
+  - 8 progetti clienti (React, Node.js, MongoDB, REST).
+  - Realizzazione di pannelli di amministrazione con
+    autenticazione e ruoli.
+  - Primi script di automazione in Python (renaming massivo
+    di asset, scraping prezzi competitori).
+
+2018 - 2019 · Stage formativo · Startup locale
+Sviluppatore web
+  - Sviluppo di componenti in JavaScript e jQuery.
+
+COMPETENZE
+Linguaggi:      JavaScript, TypeScript (base), SQL, Python
+                (base, scripting)
+Backend:        Node.js, Express, REST, GraphQL, PHP (base)
+Frontend:       React, Angular (base), HTML, CSS
+Dati:           MongoDB, PostgreSQL, Redis (base)
+Cloud/DevOps:   Firebase, Netlify, Heroku; nessuna esperienza
+                Kubernetes, AWS solo per EC2/S3
+
+FORMAZIONE
+2015 - 2018 · Laurea in Informatica, Universita di Torino.
+         Voto 85/110. Tesi in JavaScript e accessibilita web.
+
+CERTIFICAZIONI
+  - Meta Front-End Developer (2022)
+  - Nessuna certificazione cloud o backend.
+
+LINGUE
+Italiano: madrelingua. Inglese: B2. Francese: B1.
+
+NOTE
+Disponibilita: 1 mese di preavviso. Sede: Torino, ibrido.
