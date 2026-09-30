@@ -46,7 +46,26 @@
         <div class="banner error">{{ e }}</div>
       }
 
+      <div class="indeed-section">
+        <h3>Scarica da Indeed</h3>
+        <p class="muted">Avvia il downloader Indeed Employer in una nuova finestra, poi sincronizza i CV scaricati.</p>
+        <div class="row">
+          <button class="primary" (click)="launchIndeed()">Scarica da Indeed</button>
+          <button (click)="syncIndeed()" [disabled]="indeedSyncing">
+            {{ indeedSyncing ? 'Sincronizzazione…' : 'Sincronizza CV' }}
+          </button>
+        </div>
+        @if (indeedMsg) {
+          <div class="banner info">{{ indeedMsg }}</div>
+        }
+      </div>
+
       <h3>CV presenti ({{ cvs.length }})</h3>
+      @if (cvs.length > 0) {
+        <div class="row">
+          <button class="ghost danger" (click)="deleteAllCvs()">Elimina tutti</button>
+        </div>
+      }
       @if (cvs.length === 0) {
         <p class="muted">Nessun CV caricato.</p>
       }

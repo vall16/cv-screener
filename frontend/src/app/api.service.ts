@@ -73,6 +73,10 @@ export class ApiService {
     return this.http.delete(`${this.base}/api/cvs/${encodeURIComponent(name)}`);
   }
 
+  deleteAllCvs(): Observable<{ deleted: string[]; count: number }> {
+    return this.http.delete<{ deleted: string[]; count: number }>(`${this.base}/api/cvs/all`);
+  }
+
   listJobs(): Observable<JobList> {
     return this.http.get<JobList>(`${this.base}/api/jobs`);
   }
@@ -92,5 +96,13 @@ export class ApiService {
 
   getReport(name: string): Observable<Report> {
     return this.http.get<Report>(`${this.base}/api/reports/${encodeURIComponent(name)}`);
+  }
+
+  indeedLaunch(): Observable<{ ok: boolean; message: string }> {
+    return this.http.post<{ ok: boolean; message: string }>(`${this.base}/api/indeed/launch`, null);
+  }
+
+  indeedSync(): Observable<{ copied: string[]; count: number; cvs: string[] }> {
+    return this.http.post<{ copied: string[]; count: number; cvs: string[] }>(`${this.base}/api/indeed/sync`, null);
   }
 }

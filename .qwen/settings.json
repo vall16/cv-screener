@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git clone *)",
+      "Bash(pip install *)",
+      "Bash(dir *)",
+      "Bash(npx *)",
+      "Bash(findstr *)",
+      "Bash(set *)",
+      "Bash(netstat *)",
+      "Bash(.venv\\scripts\\python *)",
+      "Bash(cd *)",
+      "Bash(echo *)",
+      "Bash(ipconfig)"
+    ]
+  },
+  "$version": 4
+}

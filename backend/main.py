@@ -1,5 +1,7 @@
 """API FastAPI del progetto cv-screener."""
 import os
+import shutil
+import subprocess
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -62,6 +64,15 @@ async def api_upload_cvs(files: list[UploadFile] = File(...)):
     return {"saved": saved, "errors": errors, "cvs": screener.list_cvs()}
 
 
+@app.delete("/api/cvs/all")
+def api_delete_all_cvs():
+    deleted = []
+    for cv in screener.list_cvs():
+        if screener.delete_cv(cv):
+            deleted.append(cv)
+    return {"deleted": deleted, "count": len(deleted)}
+
+
 @app.delete("/api/cvs/{name}")
 def api_delete_cv(name: str):
     if not screener.delete_cv(name):
@@ -105,6 +116,38 @@ def api_get_report(name: str):
     if content is None:
         raise HTTPException(status_code=404, detail="Report non trovato")
     return {"name": name, "content": content}
+
+
+# ── Indeed ────────────────────────────────────────────
+INDEED_DIR = Path.home() / "indeedBulkResumesDownloader"
+INDEED_DOWNLOADS = INDEED_DIR / "downloads"
+
+
+@app.post("/api/indeed/launch")
+def api_indeed_launch():
+    """Apri una nuova finestra terminale con il downloader Indeed."""
+    if not INDEED_DIR.is_dir():
+        raise HTTPException(status_code=404, detail="Cartella indeedBulkResumesDownloader non trovata in " + str(Path.home()))
+    script = INDEED_DIR / "indeed_downloader.py"
+    if not script.is_file():
+        raise HTTPException(status_code=404, detail="indeed_downloader.py non trovato")
+    cmd = f'start cmd /k "cd /d {INDEED_DIR} && python indeed_downloader.py"'
+    subprocess.Popen(cmd, shell=True)
+    return {"ok": True, "message": "Finestra terminale aperta. Loggati su Indeed Employer e segui il menu."}
+
+
+@app.post("/api/indeed/sync")
+def api_indeed_sync():
+    """Copia i PDF scaricati da Indeed nella cartella CVs."""
+    if not INDEED_DOWNLOADS.is_dir():
+        raise HTTPException(status_code=404, detail="Cartella downloads non trovata. Esegui prima il download da Indeed.")
+    copied = []
+    for pdf in INDEED_DOWNLOADS.rglob("*.pdf"):
+        target = screener.DEFAULT_CV_DIR / pdf.name
+        if not target.exists():
+            shutil.copy2(pdf, target)
+            copied.append(pdf.name)
+    return {"copied": copied, "count": len(copied), "cvs": screener.list_cvs()}
 
 
 # ── Frontend statico (build) ──────────────────────────

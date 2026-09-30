@@ -92,6 +92,20 @@ h3 {
   border: 1px solid #f5c6c0;
 }
 
+.banner.info {
+  background: #e8f4fd;
+  color: #1a5276;
+  border: 1px solid #aed6f1;
+}
+
+.indeed-section {
+  margin: 18px 0;
+  padding: 14px 16px;
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
 .dropzone {
   border: 2px dashed #b9c2d4;
   border-radius: 12px;

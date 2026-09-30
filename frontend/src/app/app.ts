@@ -111,6 +111,16 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
+  async deleteAllCvs(): Promise<void> {
+    if (!confirm('Eliminare tutti i CV?')) return;
+    try {
+      await firstValueFrom(this.api.deleteAllCvs());
+      this.cvs = [];
+    } catch {
+      this.uploadErrors = ['Impossibile eliminare tutti i CV'];
+    }
+  }
+
   async start(): Promise<void> {
     if (!this.profile.trim()) {
       this.uploadError = 'Inserisci il profilo target.';
@@ -209,6 +219,35 @@ export class App implements OnInit, OnDestroy {
     } else if (j.status === 'done') {
       await this.loadReports();
       this.step = 'results';
+    }
+  }
+
+  indeedMsg = '';
+  indeedSyncing = false;
+
+  async launchIndeed(): Promise<void> {
+    this.indeedMsg = '';
+    try {
+      const r = await firstValueFrom(this.api.indeedLaunch());
+      this.indeedMsg = r.message;
+    } catch (e: unknown) {
+      const err = e as { error?: { detail?: string } };
+      this.indeedMsg = err?.error?.detail ?? 'Impossibile avviare il downloader Indeed.';
+    }
+  }
+
+  async syncIndeed(): Promise<void> {
+    this.indeedSyncing = true;
+    this.indeedMsg = '';
+    try {
+      const r = await firstValueFrom(this.api.indeedSync());
+      this.cvs = r.cvs;
+      this.indeedMsg = r.count > 0 ? `${r.count} CV importato/i da Indeed.` : 'Nessun nuovo CV da Indeed.';
+    } catch (e: unknown) {
+      const err = e as { error?: { detail?: string } };
+      this.indeedMsg = err?.error?.detail ?? 'Sync fallita.';
+    } finally {
+      this.indeedSyncing = false;
     }
   }
 
