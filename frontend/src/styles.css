@@ -1,1 +1,32 @@
-/* You can add global styles to this file, and also import other style files */
+/* Stili globali (non scoped: questo file e' in angular.json -> "styles").
+   Le variabili CSS e gli stili su :root/html/body DEVONO stare qui:
+   in un component stylesheet (app.css) Angular li scarta perche' non
+   puo' applicare il view encapsulation a questi selettori. */
+
+:root {
+  --bg: #f2f4f8;
+  --card: #ffffff;
+  --ink: #1c2330;
+  --muted: #6b7486;
+  --brand: #2c5f9e;
+  --brand-2: #1d4473;
+  --ok: #1e8e5a;
+  --err: #c0392b;
+  --warn: #b9770e;
+  --line: #e2e6ee;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
