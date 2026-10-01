@@ -14,7 +14,8 @@
       "Bash(ipconfig)",
       "Bash(do *)",
       "Bash(.venv\\scripts\\pip *)",
-      "Bash(del *)"
+      "Bash(del *)",
+      "Bash(git archive *)"
     ]
   },
   "$version": 4
