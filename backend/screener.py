@@ -1,4 +1,5 @@
 """Gestore dei job di screening: lancia opencode in modalità agent e traccia lo stato."""
+import json
 import os
 import re
 import shutil
@@ -12,10 +13,38 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 DEFAULT_CV_DIR = BASE_DIR / "CVs"
 REPORT_DIR_NAME = "_report"
+_JOBS_FILE = Path(__file__).resolve().parent / "jobs.json"
 
 _jobs: dict[str, dict] = {}
 _lock = threading.Lock()
 _MAX_OUTPUT_LINES = 500
+
+
+def _save_jobs() -> None:
+    """Persiste i job su disco (chiamare dentro _lock)."""
+    try:
+        _JOBS_FILE.write_text(json.dumps(_jobs, ensure_ascii=False, indent=2), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def _load_jobs() -> None:
+    """Ricarica i job dal disco all'avvio. I job 'running' diventano 'interrupted'."""
+    global _jobs
+    if not _JOBS_FILE.is_file():
+        return
+    try:
+        data = json.loads(_JOBS_FILE.read_text(encoding="utf-8"))
+        for jid, job in data.items():
+            if job.get("status") == "running":
+                job["status"] = "interrupted"
+                job["error"] = "Backend riavviato durante l'esecuzione"
+            _jobs[jid] = job
+    except (json.JSONDecodeError, OSError):
+        pass
+
+
+_load_jobs()
 
 
 def _now_iso() -> str:
@@ -84,6 +113,7 @@ def start_job(profile: str, cv_dir: Path | None = None) -> dict:
             "finished": None,
         }
         job = _jobs[job_id]
+        _save_jobs()
     threading.Thread(target=_run, args=(job_id, profile, folder), daemon=True).start()
     return job
 
@@ -104,6 +134,7 @@ def _finish(job_id: str, status: str, error: str | None = None) -> None:
         report_dir = Path(job["cv_dir"]) / REPORT_DIR_NAME
         if report_dir.is_dir():
             job["reports"] = sorted(p.name for p in report_dir.glob("*.md"))
+        _save_jobs()
 
 
 def _find_opencode() -> list[str]:

@@ -251,6 +251,10 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
+  pdfUrl(name: string): string {
+    return this.api.reportPdfUrl(name);
+  }
+
   isClassifica(name: string): boolean {
     return name.toLowerCase().includes('classifica');
   }

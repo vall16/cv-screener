@@ -312,6 +312,23 @@ button.report-item.classifica span:first-child {
   color: var(--warn);
 }
 
+.pdf-link {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--brand);
+  text-decoration: none;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  margin-left: 6px;
+}
+
+.pdf-link:hover {
+  background: var(--brand);
+  color: #fff;
+}
+
 .viewer article {
   max-height: 72vh;
   overflow-y: auto;

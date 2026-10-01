@@ -90,6 +90,7 @@ npm run build                 # output in frontend/dist/cv-screener/browser
 | `GET` | `/api/jobs/{id}` | stato e output live del job |
 | `GET` | `/api/reports` | lista i report in `_report/` |
 | `GET` | `/api/reports/{name}` | contenuto di un report |
+| `GET` | `/api/reports/{name}/pdf` | download del report in PDF |
 
 ## Uso senza web UI
 
@@ -148,7 +149,7 @@ I PDF finiscono in `indeedBulkResumesDownloader\downloads\NomePosizione\`.
 - Formati supportati: **PDF e TXT**. I DOCX vanno convertiti o letti tramite MCP.
 - L'agente non inventa dati: se un'informazione non è nel CV, lo scrive esplicitamente e
   cita la sezione da cui trae ogni affermazione.
-- I job vivono in memoria: riavviando il backend la cronologia si azzera (i report su disco no).
+- I job sono persistiti in `backend/jobs.json`: la cronologia sopravvive ai riavvii (i job "running" diventano "interrupted").
 - Per N posizioni diverse: lancia N job in parallelo su cartelle CV separate.
 - I CV e i report sono in `.gitignore` per evitare di committare dati personali.
 - Per usare l'agente in altri progetti basta copiare `.opencode/agent/hr-recruiter.md`

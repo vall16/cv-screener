@@ -98,6 +98,10 @@ export class ApiService {
     return this.http.get<Report>(`${this.base}/api/reports/${encodeURIComponent(name)}`);
   }
 
+  reportPdfUrl(name: string): string {
+    return `${this.base}/api/reports/${encodeURIComponent(name)}/pdf`;
+  }
+
   indeedLaunch(): Observable<{ ok: boolean; message: string }> {
     return this.http.post<{ ok: boolean; message: string }>(`${this.base}/api/indeed/launch`, null);
   }

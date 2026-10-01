@@ -1,13 +1,16 @@
 """API FastAPI del progetto cv-screener."""
+import io
 import os
 import shutil
 import subprocess
 from pathlib import Path
 
+import markdown
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from xhtml2pdf import pisa
 
 import screener
 
@@ -116,6 +119,34 @@ def api_get_report(name: str):
     if content is None:
         raise HTTPException(status_code=404, detail="Report non trovato")
     return {"name": name, "content": content}
+
+
+@app.get("/api/reports/{name}/pdf")
+def api_report_pdf(name: str):
+    """Converte un report markdown in PDF e lo restituisce come download."""
+    content = screener.read_report(name)
+    if content is None:
+        raise HTTPException(status_code=404, detail="Report non trovato")
+    body = markdown.markdown(content, extensions=["tables", "fenced_code"])
+    html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>
+body {{ font-family: Arial, sans-serif; font-size: 11px; padding: 20px; }}
+h1 {{ font-size: 18px; }} h2 {{ font-size: 14px; }} h3 {{ font-size: 12px; }}
+table {{ border-collapse: collapse; width: 100%; }}
+th, td {{ border: 1px solid #ccc; padding: 6px; text-align: left; font-size: 10px; }}
+th {{ background: #f5f5f5; }}
+code {{ font-family: Consolas, monospace; font-size: 10px; }}
+pre {{ background: #f5f5f5; padding: 8px; font-size: 10px; }}
+</style></head><body>{body}</body></html>"""
+    buf = io.BytesIO()
+    pisa.CreatePDF(html, dest=buf, encoding="utf-8")
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{name}.pdf"'},
+    )
 
 
 # ── Indeed ────────────────────────────────────────────

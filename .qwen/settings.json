@@ -11,7 +11,10 @@
       "Bash(.venv\\scripts\\python *)",
       "Bash(cd *)",
       "Bash(echo *)",
-      "Bash(ipconfig)"
+      "Bash(ipconfig)",
+      "Bash(do *)",
+      "Bash(.venv\\scripts\\pip *)",
+      "Bash(del *)"
     ]
   },
   "$version": 4
