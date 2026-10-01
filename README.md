@@ -121,6 +121,28 @@ Per ogni candidato un report in `CVs/_report/N-Nome.md` con punteggio pesato:
 
 Più `CVs/_report/classifica.md` con tabella comparativa, top-3 motivata e lista degli scartati.
 
+## Scaricare CV da Indeed
+
+Il tool [indeedBulkResumesDownloader](https://github.com/YasserLoukniti/indeedBulkResumesDownloader) è installato in `C:\Users\vallo\indeedBulkResumesDownloader`.
+
+### Da web UI
+
+1. Clicca **"Scarica da Indeed"** → si apre una finestra terminale
+2. Loggati su Indeed Employer
+3. Scegli: **1 - 1 - 2 - 4** (Backend, Tutti i job, Aperte + Sospese)
+4. Quando ha finito, clicca **"Sincronizza CV"** nella web UI
+
+### Da terminale
+
+```bash
+cd C:\Users\vallo\indeedBulkResumesDownloader
+python indeed_downloader.py
+```
+
+Scelte da fare: **1 - 1 - 2 - 4**
+
+I PDF finiscono in `indeedBulkResumesDownloader\downloads\NomePosizione\`.
+
 ## Note
 
 - Formati supportati: **PDF e TXT**. I DOCX vanno convertiti o letti tramite MCP.
