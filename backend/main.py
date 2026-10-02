@@ -164,7 +164,8 @@ def api_indeed_launch():
     if not script.is_file():
         raise HTTPException(status_code=404, detail="indeed_downloader.py non trovato")
     python = str(INDEED_PYTHON) if INDEED_PYTHON.is_file() else "python"
-    cmd = f'start cmd /k "cd /d {INDEED_DIR} && {python} indeed_downloader.py"'
+    runner = str(Path(__file__).resolve().parent / "indeed_runner.py")
+    cmd = f'start cmd /k "cd /d {INDEED_DIR} && {python} {runner} {script}"'
     subprocess.Popen(cmd, shell=True)
     return {"ok": True, "message": "Finestra terminale aperta. Loggati su Indeed Employer e segui il menu."}
 
