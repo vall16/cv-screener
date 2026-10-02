@@ -152,6 +152,7 @@ pre {{ background: #f5f5f5; padding: 8px; font-size: 10px; }}
 # ── Indeed ────────────────────────────────────────────
 INDEED_DIR = Path.home() / "indeedBulkResumesDownloader"
 INDEED_DOWNLOADS = INDEED_DIR / "downloads"
+INDEED_PYTHON = INDEED_DIR / ".venv" / "Scripts" / "python.exe"
 
 
 @app.post("/api/indeed/launch")
@@ -162,7 +163,8 @@ def api_indeed_launch():
     script = INDEED_DIR / "indeed_downloader.py"
     if not script.is_file():
         raise HTTPException(status_code=404, detail="indeed_downloader.py non trovato")
-    cmd = f'start cmd /k "cd /d {INDEED_DIR} && python indeed_downloader.py"'
+    python = str(INDEED_PYTHON) if INDEED_PYTHON.is_file() else "python"
+    cmd = f'start cmd /k "cd /d {INDEED_DIR} && {python} indeed_downloader.py"'
     subprocess.Popen(cmd, shell=True)
     return {"ok": True, "message": "Finestra terminale aperta. Loggati su Indeed Employer e segui il menu."}
 
