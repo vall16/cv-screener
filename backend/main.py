@@ -3,6 +3,8 @@ import io
 import os
 import shutil
 import subprocess
+import zipfile
+from datetime import datetime
 from pathlib import Path
 
 import markdown
@@ -84,6 +86,42 @@ def api_delete_cv(name: str):
 
 
 # ── Jobs ──────────────────────────────────────────────
+def _zip_cvs_stream(names: list[str], chunk_size: int = 256 * 1024):
+    """Genera lo ZIP dei CV in memoria e lo spacca in blocchi.
+
+    Niente file temporaneo: sul server non viene scritto nulla, l'archivio vive
+    solo nella memoria di questo processo e viene consumato via via dal client,
+    che lo scrive sul proprio disco. compresslevel=1 perche' i PDF sono gia'
+    compressi e deflare di piu' non ci guadagnerebbe.
+    """
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED, compresslevel=1) as zf:
+        for name in names:
+            src = screener.DEFAULT_CV_DIR / name
+            if src.is_file():
+                zf.write(src, arcname=name)
+    buf.seek(0)
+    while True:
+        chunk = buf.read(chunk_size)
+        if not chunk:
+            break
+        yield chunk
+
+
+@app.get("/api/cvs/export")
+def api_export_cvs():
+    """Scarica tutti i CV in uno ZIP. Pensato per il caso server: il client li porta in locale."""
+    names = screener.list_cvs()
+    if not names:
+        raise HTTPException(status_code=404, detail="Nessun CV da esportare")
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    return StreamingResponse(
+        _zip_cvs_stream(names),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="cv-screener-{stamp}.zip"'},
+    )
+
+
 @app.get("/api/jobs")
 def api_list_jobs():
     return {"jobs": screener.get_jobs()}

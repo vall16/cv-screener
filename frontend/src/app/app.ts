@@ -34,7 +34,7 @@ export class App implements OnInit, OnDestroy {
 
   private pollId: ReturnType<typeof setInterval> | null = null;
 
-  constructor(private api: ApiService) {}
+  constructor(protected api: ApiService) {}
 
   async ngOnInit(): Promise<void> {
     await this.refreshAll();

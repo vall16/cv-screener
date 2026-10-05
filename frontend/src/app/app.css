@@ -176,6 +176,24 @@ button.ghost {
   border: 1px solid var(--line);
 }
 
+/* Stile di button.ghost, perche' il download e' un <a> e non un <button> */
+a.ghost {
+  display: inline-block;
+  background: transparent;
+  color: var(--brand);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+a.ghost:hover {
+  background: #f0f4fa;
+}
+
 button.ghost.danger {
   color: var(--err);
 }

@@ -73,6 +73,10 @@ export class ApiService {
     return this.http.delete(`${this.base}/api/cvs/${encodeURIComponent(name)}`);
   }
 
+  exportCvsUrl(): string {
+    return `${this.base}/api/cvs/export`;
+  }
+
   deleteAllCvs(): Observable<{ deleted: string[]; count: number }> {
     return this.http.delete<{ deleted: string[]; count: number }>(`${this.base}/api/cvs/all`);
   }

@@ -79,6 +79,10 @@
       </ul>
 
       @if (cvs.length > 0) {
+        <div class="row">
+          <a class="ghost" [href]="api.exportCvsUrl()">Scarica tutti i CV (ZIP)</a>
+          <span class="muted">{{ cvs.length }} file · PDF e TXT</span>
+        </div>
         <div class="row end">
           <button class="primary" (click)="go('run')">Continua → Profilo e screening</button>
         </div>
