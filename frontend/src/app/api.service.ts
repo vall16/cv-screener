@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
 export interface CvList {
@@ -19,6 +19,8 @@ export interface Job {
   status: JobStatus;
   profile: string;
   cv_dir: string;
+  session_id: string | null;
+  cvs: string[];
   output: string[];
   error: string | null;
   reports: string[];
@@ -34,6 +36,18 @@ export interface JobList {
   jobs: Job[];
 }
 
+export interface Session {
+  id: string;
+  name: string;
+  profile: string;
+  cvs: string[];
+  created_at: string;
+}
+
+export interface SessionList {
+  sessions: Session[];
+}
+
 export interface ReportList {
   reports: string[];
 }
@@ -41,6 +55,19 @@ export interface ReportList {
 export interface Report {
   name: string;
   content: string;
+}
+
+export interface Candidate {
+  name: string;
+  file: string;
+  score: number | null;
+  giudizio: string | null;
+  esperienza: string | null;
+  fit: string | null;
+}
+
+export interface CandidateList {
+  candidates: Candidate[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -85,25 +112,47 @@ export class ApiService {
     return this.http.get<JobList>(`${this.base}/api/jobs`);
   }
 
-  startJob(profile: string): Observable<JobResult> {
-    const params = new HttpParams().set('profile', profile);
-    return this.http.post<JobResult>(`${this.base}/api/jobs`, null, { params });
+  startJob(profile: string, sessionId?: string, cvs?: string[]): Observable<JobResult> {
+    const body: { profile: string; session_id?: string; cvs?: string[] } = { profile };
+    if (sessionId) body.session_id = sessionId;
+    if (cvs) body.cvs = cvs;
+    return this.http.post<JobResult>(`${this.base}/api/jobs`, body);
   }
 
   getJob(id: string): Observable<JobResult> {
     return this.http.get<JobResult>(`${this.base}/api/jobs/${id}`);
   }
 
-  listReports(): Observable<ReportList> {
-    return this.http.get<ReportList>(`${this.base}/api/reports`);
+  listSessions(): Observable<SessionList> {
+    return this.http.get<SessionList>(`${this.base}/api/sessions`);
   }
 
-  getReport(name: string): Observable<Report> {
-    return this.http.get<Report>(`${this.base}/api/reports/${encodeURIComponent(name)}`);
+  createSession(name: string, profile: string, cvs: string[]): Observable<Session> {
+    return this.http.post<Session>(`${this.base}/api/sessions`, { name, profile, cvs });
   }
 
-  reportPdfUrl(name: string): string {
-    return `${this.base}/api/reports/${encodeURIComponent(name)}/pdf`;
+  deleteSession(id: string): Observable<{ ok: boolean }> {
+    return this.http.delete<{ ok: boolean }>(`${this.base}/api/sessions/${encodeURIComponent(id)}`);
+  }
+
+  listReports(session?: string): Observable<ReportList> {
+    const q = session ? `?session=${encodeURIComponent(session)}` : '';
+    return this.http.get<ReportList>(`${this.base}/api/reports${q}`);
+  }
+
+  getReport(name: string, session?: string): Observable<Report> {
+    const q = session ? `?session=${encodeURIComponent(session)}` : '';
+    return this.http.get<Report>(`${this.base}/api/reports/${encodeURIComponent(name)}${q}`);
+  }
+
+  listCandidates(session?: string): Observable<CandidateList> {
+    const q = session ? `?session=${encodeURIComponent(session)}` : '';
+    return this.http.get<CandidateList>(`${this.base}/api/reports/summary${q}`);
+  }
+
+  reportPdfUrl(name: string, session?: string): string {
+    const q = session ? `?session=${encodeURIComponent(session)}` : '';
+    return `${this.base}/api/reports/${encodeURIComponent(name)}/pdf${q}`;
   }
 
   indeedLaunch(): Observable<{ ok: boolean; message: string }> {

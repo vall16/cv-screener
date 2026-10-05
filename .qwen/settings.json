@@ -15,7 +15,14 @@
       "Bash(do *)",
       "Bash(.venv\\scripts\\pip *)",
       "Bash(del *)",
-      "Bash(git archive *)"
+      "Bash(git archive *)",
+      "Bash(.venv\\scripts\\python.exe *)",
+      "Bash(start-sleep *)",
+      "Bash(write-host *)",
+      "Bash(try *)",
+      "Bash(get-ciminstance *)",
+      "Bash(select-object *)",
+      "Bash(format-list)"
     ]
   },
   "$version": 4

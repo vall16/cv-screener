@@ -9,6 +9,7 @@ from pathlib import Path
 
 import markdown
 from fastapi import FastAPI, File, HTTPException, UploadFile
+from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -122,18 +123,39 @@ def api_export_cvs():
     )
 
 
+class ScreeningReq(BaseModel):
+    profile: str
+    session_id: str | None = None
+    cvs: list[str] | None = None
+
+
+class CreateSessionReq(BaseModel):
+    name: str
+    profile: str
+    cvs: list[str]
+
+
 @app.get("/api/jobs")
 def api_list_jobs():
     return {"jobs": screener.get_jobs()}
 
 
 @app.post("/api/jobs")
-def api_start_job(profile: str):
-    if not profile or not profile.strip():
+def api_start_job(req: ScreeningReq):
+    if not req.profile or not req.profile.strip():
         raise HTTPException(status_code=422, detail="Inserisci il profilo target")
-    if not screener.list_cvs():
-        raise HTTPException(status_code=422, detail="Nessun CV presente nella cartella CVs")
-    job = screener.start_job(profile.strip())
+    if req.session_id:
+        session = screener.get_session(req.session_id)
+        if session is None:
+            raise HTTPException(status_code=404, detail="Posizione non trovata")
+        cvs = req.cvs if req.cvs else session.get("cvs", [])
+        if not cvs:
+            raise HTTPException(status_code=422, detail="La posizione non ha CV selezionati")
+        job = screener.start_job(req.profile.strip(), session_id=req.session_id, cv_names=cvs)
+    else:
+        if not screener.list_cvs():
+            raise HTTPException(status_code=422, detail="Nessun CV presente nella cartella CVs")
+        job = screener.start_job(req.profile.strip())
     return {"job": job}
 
 
@@ -145,24 +167,50 @@ def api_get_job(job_id: str):
     return {"job": job}
 
 
+# ── Sessioni (posizioni) ─────────────────────────────
+@app.get("/api/sessions")
+def api_list_sessions():
+    return {"sessions": screener.list_sessions()}
+
+
+@app.post("/api/sessions")
+def api_create_session(req: CreateSessionReq):
+    if not req.name or not req.name.strip():
+        raise HTTPException(status_code=422, detail="Inserisci il nome della posizione")
+    return screener.create_session(req.name, req.profile, req.cvs)
+
+
+@app.delete("/api/sessions/{session_id}")
+def api_delete_session(session_id: str):
+    if not screener.delete_session(session_id):
+        raise HTTPException(status_code=404, detail="Posizione non trovata")
+    return {"ok": True}
+
+
 # ── Report ────────────────────────────────────────────
 @app.get("/api/reports")
-def api_list_reports():
-    return {"reports": screener.list_reports()}
+def api_list_reports(session: str | None = None):
+    return {"reports": screener.list_reports(session)}
+
+
+@app.get("/api/reports/summary")
+def api_reports_summary(session: str | None = None):
+    """Dati strutturati dei candidati (voto, giudizio, esperienza) per la tabella interattiva."""
+    return {"candidates": screener.get_candidates_summary(session)}
 
 
 @app.get("/api/reports/{name}")
-def api_get_report(name: str):
-    content = screener.read_report(name)
+def api_get_report(name: str, session: str | None = None):
+    content = screener.read_report(name, session)
     if content is None:
         raise HTTPException(status_code=404, detail="Report non trovato")
     return {"name": name, "content": content}
 
 
 @app.get("/api/reports/{name}/pdf")
-def api_report_pdf(name: str):
+def api_report_pdf(name: str, session: str | None = None):
     """Converte un report markdown in PDF e lo restituisce come download."""
-    content = screener.read_report(name)
+    content = screener.read_report(name, session)
     if content is None:
         raise HTTPException(status_code=404, detail="Report non trovato")
     body = markdown.markdown(content, extensions=["tables", "fenced_code"])

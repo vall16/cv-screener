@@ -366,6 +366,248 @@ button.report-item.classifica span:first-child {
   padding-left: 22px;
 }
 
+/* ── Tabella candidati (risultati interattivi) ── */
+.candidates {
+  margin-bottom: 16px;
+}
+
+.cand-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.cand-filters {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chip:hover {
+  background: #f0f4fa;
+}
+
+.chip.active {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+}
+
+.chip.pass.active {
+  background: var(--ok);
+  border-color: var(--ok);
+}
+
+.chip.eval.active {
+  background: var(--warn);
+  border-color: var(--warn);
+}
+
+.chip.no.active {
+  background: var(--err);
+  border-color: var(--err);
+}
+
+.cand-min {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.cand-min input {
+  width: 70px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.cand-search {
+  width: 200px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.cand-table-wrap {
+  overflow-x: auto;
+  margin-top: 14px;
+}
+
+.cand-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.cand-table th {
+  text-align: left;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  padding: 8px 12px;
+  border-bottom: 2px solid var(--line);
+  white-space: nowrap;
+}
+
+.cand-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.cand-table th.sortable:hover {
+  color: var(--brand);
+}
+
+.cand-table th.sorted {
+  color: var(--brand);
+}
+
+.cand-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+.cand-row {
+  cursor: pointer;
+}
+
+.cand-row:hover {
+  background: #f0f4fa;
+}
+
+.cand-name {
+  font-weight: 600;
+}
+
+.cand-score {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.cand-exp {
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.cand-empty {
+  text-align: center;
+  padding: 20px;
+}
+
+.num {
+  text-align: right;
+}
+
+.pill.pass {
+  background: var(--ok);
+}
+
+.pill.eval {
+  background: var(--warn);
+}
+
+.pill.no {
+  background: var(--err);
+}
+
+/* ── Sessioni / posizioni ── */
+.pos-form {
+  margin-top: 8px;
+}
+
+.pos-cvs {
+  margin: 12px 0;
+  padding: 12px;
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.pos-cv-list {
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.pos-cv-list li {
+  justify-content: flex-start;
+}
+
+.cv-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  width: 100%;
+}
+
+.cv-check input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--brand);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.pos-item {
+  align-items: center;
+}
+
+.pos-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.pos-item .row {
+  margin: 0;
+}
+
+.session-picker {
+  margin-bottom: 16px;
+}
+
+select {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 15px;
+  width: 100%;
+  max-width: 460px;
+  background: #fff;
+}
+
 .foot {
   text-align: center;
   color: var(--muted);

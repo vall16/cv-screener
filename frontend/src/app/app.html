@@ -93,22 +93,75 @@
   <!-- ─── 2 · Screening ──────────────────────────── -->
   @if (step === 'run') {
     <section class="card">
-      <h2>Avvia lo screening</h2>
+      <h2>Nuova posizione</h2>
+      <p class="muted">Crea una posizione, seleziona i CV da screenare e avvia lo screening. Ogni posizione ha i propri report isolati.</p>
 
-      <label class="field">
-        <span>Profilo target</span>
-        <input [(ngModel)]="profile" (keyup.enter)="start()" placeholder="es. senior backend developer" />
-      </label>
+      @if (cvs.length === 0) {
+        <div class="banner info">Carica prima almeno un CV (passo 1).</div>
+      }
 
-      <div class="row">
-        <button class="primary" (click)="start()" [disabled]="job?.status === 'running' || cvs.length === 0">
-          {{ job?.status === 'running' ? 'Screening in corso…' : 'Avvia screening' }}
-        </button>
-        @if (cvs.length === 0) {
-          <span class="muted">Carica prima almeno un CV (passo 1).</span>
-        }
+      <div class="pos-form">
+        <label class="field">
+          <span>Nome posizione</span>
+          <input [(ngModel)]="newSessionName" placeholder="es. Backend Developer — Milano" />
+        </label>
+        <label class="field">
+          <span>Profilo target</span>
+          <input [(ngModel)]="profile" placeholder="es. senior backend developer, 5+ anni, Go/Python" />
+        </label>
+
+        <div class="pos-cvs">
+          <div class="row">
+            <span class="muted">CV da screenare ({{ newSessionCvs.length }}/{{ cvs.length }})</span>
+            <div class="row">
+              <button class="ghost" (click)="selectAllCvs()">Seleziona tutti</button>
+              <button class="ghost" (click)="deselectAllCvs()">Deseleziona</button>
+            </div>
+          </div>
+          <ul class="cvs pos-cv-list">
+            @for (c of cvs; track c) {
+              <li>
+                <label class="cv-check">
+                  <input type="checkbox" [checked]="newSessionCvs.includes(c)" (change)="toggleCvSelection(c)" />
+                  <span class="file">{{ c }}</span>
+                </label>
+              </li>
+            }
+          </ul>
+        </div>
+
+        <div class="row">
+          <button class="primary" (click)="createNewSession()" [disabled]="creatingSession || cvs.length === 0">
+            {{ creatingSession ? 'Creazione…' : 'Crea posizione' }}
+          </button>
+        </div>
       </div>
+    </section>
 
+    @if (sessions.length) {
+      <section class="card">
+        <h2>Posizioni ({{ sessions.length }})</h2>
+        <ul class="cvs">
+          @for (s of sessions; track s.id) {
+            <li class="pos-item">
+              <div class="pos-main">
+                <span class="file">{{ s.name }}</span>
+                <span class="muted">{{ s.profile }}</span>
+                <span class="muted">{{ s.cvs.length }} CV</span>
+              </div>
+              <div class="row">
+                <button class="primary" (click)="startSessionScreening(s)" [disabled]="job?.status === 'running'">
+                  Avvia screening
+                </button>
+                <button class="ghost danger" (click)="deleteSession(s)">Elimina</button>
+              </div>
+            </li>
+          }
+        </ul>
+      </section>
+    }
+
+    <section class="card">
       @if (job) {
         <div class="job" [class.done]="job.status === 'done'" [class.error]="job.status === 'error'">
           <div class="job-head">
@@ -134,10 +187,12 @@
 
           @if (job.status === 'done') {
             <div class="row end">
-              <button class="primary" (click)="go('results')">Vai ai risultati →</button>
+              <button class="primary" (click)="goResults()">Vai ai risultati →</button>
             </div>
           }
         </div>
+      } @else {
+        <p class="muted">Nessuno screening in corso. Crea una posizione qui sopra e avvia lo screening.</p>
       }
 
       @if (history.length > 1) {
@@ -157,6 +212,75 @@
 
   <!-- ─── 3 · Risultati ──────────────────────────── -->
   @if (step === 'results') {
+    @if (sessions.length) {
+      <section class="card session-picker">
+        <label class="field">
+          <span>Posizione</span>
+          <select [(ngModel)]="activeSessionId" (change)="switchSession(activeSessionId)">
+            <option value="">Tutti i report (senza posizione)</option>
+            @for (s of sessions; track s.id) {
+              <option [value]="s.id">{{ s.name }} — {{ s.profile }}</option>
+            }
+          </select>
+        </label>
+      </section>
+    }
+
+    @if (candidates.length) {
+      <section class="card candidates">
+        <div class="cand-toolbar">
+          <h2>Candidati ({{ candCounts().total }})</h2>
+          <div class="cand-filters">
+            <div class="chips">
+              <button class="chip" [class.active]="candFilterGiudizio === 'all'" (click)="candFilterGiudizio = 'all'">Tutti</button>
+              <button class="chip pass" [class.active]="candFilterGiudizio === 'Si passa'" (click)="candFilterGiudizio = 'Si passa'">Si passa ({{ candCounts().pass }})</button>
+              <button class="chip eval" [class.active]="candFilterGiudizio === 'Da valutare'" (click)="candFilterGiudizio = 'Da valutare'">Da valutare ({{ candCounts().eval }})</button>
+              <button class="chip no" [class.active]="candFilterGiudizio === 'No'" (click)="candFilterGiudizio = 'No'">No ({{ candCounts().no }})</button>
+            </div>
+            <label class="cand-min">
+              Voto min
+              <input type="number" min="0" max="100" [(ngModel)]="candMinScore" />
+            </label>
+            <input class="cand-search" type="text" placeholder="Cerca per nome…" [(ngModel)]="candSearch" />
+          </div>
+        </div>
+
+        <div class="cand-table-wrap">
+          <table class="cand-table">
+            <thead>
+              <tr>
+                <th class="sortable" (click)="toggleSort('name')" [class.sorted]="candSortField === 'name'">Nome{{ sortArrow('name') }}</th>
+                <th class="sortable num" (click)="toggleSort('score')" [class.sorted]="candSortField === 'score'">Voto{{ sortArrow('score') }}</th>
+                <th>Giudizio</th>
+                <th>Esperienza</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (c of visibleCandidates(); track c.file) {
+                <tr class="cand-row" (click)="openCandidate(c)">
+                  <td class="cand-name">{{ c.name }}</td>
+                  <td class="cand-score num">{{ c.score ?? '—' }}</td>
+                  <td>
+                    @if (c.giudizio) {
+                      <span class="pill" [class]="giudizioClass(c.giudizio)">{{ c.giudizio }}</span>
+                    } @else {
+                      <span class="muted">—</span>
+                    }
+                  </td>
+                  <td class="cand-exp" [title]="c.esperienza ?? ''">{{ c.esperienza ?? '—' }}</td>
+                </tr>
+              }
+              @empty {
+                <tr>
+                  <td colspan="4" class="muted cand-empty">Nessun candidato corrisponde ai filtri.</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    }
+
     <section class="results">
       <aside class="card">
         <h2>Report</h2>

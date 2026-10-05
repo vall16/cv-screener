@@ -2,7 +2,7 @@ import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
-import { ApiService, Job } from './api.service';
+import { ApiService, Candidate, Job, Session } from './api.service';
 import { renderMarkdown } from './markdown';
 
 type Step = 'upload' | 'run' | 'results';
@@ -31,6 +31,21 @@ export class App implements OnInit, OnDestroy {
   activeReport = '';
   activeHtml = '';
   loadingReport = false;
+
+  // Tabella candidati (risultati interattivi)
+  candidates: Candidate[] = [];
+  candFilterGiudizio = 'all'; // 'all' | 'Si passa' | 'Da valutare' | 'No'
+  candMinScore = 0;
+  candSearch = '';
+  candSortField: 'score' | 'name' = 'score';
+  candSortDir: 'asc' | 'desc' = 'desc';
+
+  // Sessioni (posizioni)
+  sessions: Session[] = [];
+  activeSessionId = ''; // '' = report legacy (senza posizione)
+  newSessionName = '';
+  newSessionCvs: string[] = [];
+  creatingSession = false;
 
   private pollId: ReturnType<typeof setInterval> | null = null;
 
@@ -63,7 +78,13 @@ export class App implements OnInit, OnDestroy {
     }
     if (step === 'upload' || step === 'run') {
       void this.loadJobs();
+      void this.loadSessions();
     }
+  }
+
+  goResults(): void {
+    if (this.job?.session_id) this.activeSessionId = this.job.session_id;
+    this.go('results');
   }
 
   async refreshAll(): Promise<void> {
@@ -74,6 +95,7 @@ export class App implements OnInit, OnDestroy {
       this.uploadError = 'Backend non raggiungibile. Avvia il backend (python backend/main.py).';
     }
     await this.loadJobs();
+    await this.loadSessions();
     await this.loadReports();
   }
 
@@ -121,15 +143,82 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
-  async start(): Promise<void> {
+  // ── Sessioni (posizioni) ──────────────────────────
+  async loadSessions(): Promise<void> {
+    try {
+      const r = await firstValueFrom(this.api.listSessions());
+      this.sessions = r.sessions;
+    } catch {
+      this.sessions = [];
+    }
+  }
+
+  async createNewSession(): Promise<void> {
+    if (!this.newSessionName.trim()) {
+      this.uploadError = 'Inserisci il nome della posizione.';
+      return;
+    }
     if (!this.profile.trim()) {
       this.uploadError = 'Inserisci il profilo target.';
+      return;
+    }
+    if (!this.newSessionCvs.length) {
+      this.uploadError = 'Seleziona almeno un CV per la posizione.';
+      return;
+    }
+    this.uploadError = '';
+    this.creatingSession = true;
+    try {
+      const s = await firstValueFrom(
+        this.api.createSession(this.newSessionName.trim(), this.profile.trim(), this.newSessionCvs),
+      );
+      await this.loadSessions();
+      this.newSessionName = '';
+      this.profile = '';
+      this.newSessionCvs = [];
+      this.activeSessionId = s.id;
+    } catch (e: unknown) {
+      const err = e as { error?: { detail?: string } };
+      this.uploadError = err?.error?.detail ?? 'Impossibile creare la posizione.';
+    } finally {
+      this.creatingSession = false;
+    }
+  }
+
+  async deleteSession(s: Session): Promise<void> {
+    if (!confirm(`Eliminare la posizione "${s.name}" e i suoi report?`)) return;
+    try {
+      await firstValueFrom(this.api.deleteSession(s.id));
+      if (this.activeSessionId === s.id) this.activeSessionId = '';
+      await this.loadSessions();
+    } catch {
+      this.uploadError = 'Impossibile eliminare la posizione.';
+    }
+  }
+
+  toggleCvSelection(name: string): void {
+    const i = this.newSessionCvs.indexOf(name);
+    if (i >= 0) this.newSessionCvs.splice(i, 1);
+    else this.newSessionCvs.push(name);
+  }
+
+  selectAllCvs(): void {
+    this.newSessionCvs = [...this.cvs];
+  }
+
+  deselectAllCvs(): void {
+    this.newSessionCvs = [];
+  }
+
+  async startSessionScreening(s: Session): Promise<void> {
+    if (!s.cvs.length) {
+      this.uploadError = 'La posizione non ha CV selezionati.';
       return;
     }
     this.uploadError = '';
     this.job = null;
     try {
-      const r = await firstValueFrom(this.api.startJob(this.profile.trim()));
+      const r = await firstValueFrom(this.api.startJob(s.profile, s.id, s.cvs));
       this.job = r.job;
       this.step = 'run';
       this.startPolling();
@@ -138,6 +227,16 @@ export class App implements OnInit, OnDestroy {
       const err = e as { error?: { detail?: string } };
       this.uploadError = err?.error?.detail ?? 'Impossibile avviare lo screening.';
     }
+  }
+
+  async switchSession(sessionId: string): Promise<void> {
+    this.activeSessionId = sessionId;
+    this.activeReport = '';
+    this.activeHtml = '';
+    this.candFilterGiudizio = 'all';
+    this.candMinScore = 0;
+    this.candSearch = '';
+    await this.loadReports();
   }
 
   startPolling(): void {
@@ -166,6 +265,7 @@ export class App implements OnInit, OnDestroy {
       this.job = r.job;
       if (this.job.status !== 'running') {
         this.stopPolling();
+        if (this.job.session_id) this.activeSessionId = this.job.session_id;
         await this.loadReports();
         await this.loadJobs();
       }
@@ -184,25 +284,99 @@ export class App implements OnInit, OnDestroy {
   }
 
   async loadReports(): Promise<void> {
+    const session = this.activeSessionId || undefined;
     try {
-      const r = await firstValueFrom(this.api.listReports());
+      const r = await firstValueFrom(this.api.listReports(session));
       this.reports = r.reports;
       if (r.reports.length && !r.reports.includes(this.activeReport)) {
         this.activeReport = r.reports.includes('classifica.md')
           ? 'classifica.md'
           : r.reports[0];
         await this.openReport(this.activeReport);
+      } else if (!r.reports.length) {
+        this.activeReport = '';
+        this.activeHtml = '';
       }
     } catch {
       this.reports = [];
     }
+    await this.loadCandidates();
+  }
+
+  async loadCandidates(): Promise<void> {
+    const session = this.activeSessionId || undefined;
+    try {
+      const r = await firstValueFrom(this.api.listCandidates(session));
+      this.candidates = r.candidates;
+    } catch {
+      this.candidates = [];
+    }
+  }
+
+  // Candidati dopo filtri + ordinamento (ricomputato a ogni change detection).
+  visibleCandidates(): Candidate[] {
+    let list = this.candidates;
+    if (this.candFilterGiudizio !== 'all') {
+      list = list.filter((c) => c.giudizio === this.candFilterGiudizio);
+    }
+    if (this.candMinScore > 0) {
+      list = list.filter((c) => c.score !== null && c.score >= this.candMinScore);
+    }
+    const q = this.candSearch.trim().toLowerCase();
+    if (q) {
+      list = list.filter((c) => c.name.toLowerCase().includes(q));
+    }
+    const dir = this.candSortDir === 'asc' ? 1 : -1;
+    return [...list].sort((a, b) => {
+      if (this.candSortField === 'score') {
+        return ((a.score ?? -1) - (b.score ?? -1)) * dir;
+      }
+      return a.name.localeCompare(b.name, 'it') * dir;
+    });
+  }
+
+  candCounts(): { pass: number; eval: number; no: number; total: number } {
+    let pass = 0;
+    let ev = 0;
+    let no = 0;
+    for (const c of this.candidates) {
+      if (c.giudizio === 'Si passa') pass++;
+      else if (c.giudizio === 'Da valutare') ev++;
+      else if (c.giudizio === 'No') no++;
+    }
+    return { pass, eval: ev, no, total: this.candidates.length };
+  }
+
+  toggleSort(field: 'score' | 'name'): void {
+    if (this.candSortField === field) {
+      this.candSortDir = this.candSortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      this.candSortField = field;
+      this.candSortDir = field === 'score' ? 'desc' : 'asc';
+    }
+  }
+
+  sortArrow(field: 'score' | 'name'): string {
+    if (this.candSortField !== field) return '';
+    return this.candSortDir === 'asc' ? ' ↑' : ' ↓';
+  }
+
+  openCandidate(c: Candidate): void {
+    void this.openReport(c.file);
+  }
+
+  giudizioClass(g: string | null): string {
+    if (g === 'Si passa') return 'pass';
+    if (g === 'Da valutare') return 'eval';
+    if (g === 'No') return 'no';
+    return '';
   }
 
   async openReport(name: string): Promise<void> {
     this.activeReport = name;
     this.loadingReport = true;
     try {
-      const r = await firstValueFrom(this.api.getReport(name));
+      const r = await firstValueFrom(this.api.getReport(name, this.activeSessionId || undefined));
       this.activeHtml = renderMarkdown(r.content);
     } catch {
       this.activeHtml = '<p>Errore nel caricamento del report.</p>';
@@ -217,6 +391,7 @@ export class App implements OnInit, OnDestroy {
     if (j.status === 'running') {
       this.startPolling();
     } else if (j.status === 'done') {
+      if (j.session_id) this.activeSessionId = j.session_id;
       await this.loadReports();
       this.step = 'results';
     }
@@ -252,7 +427,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   pdfUrl(name: string): string {
-    return this.api.reportPdfUrl(name);
+    return this.api.reportPdfUrl(name, this.activeSessionId || undefined);
   }
 
   isClassifica(name: string): boolean {
