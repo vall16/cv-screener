@@ -22,7 +22,10 @@
       "Bash(try *)",
       "Bash(get-ciminstance *)",
       "Bash(select-object *)",
-      "Bash(format-list)"
+      "Bash(format-list)",
+      "Bash(tasklist *)",
+      "Bash(get-nettcpconnection *)",
+      "Bash(get-process *)"
     ]
   },
   "$version": 4
