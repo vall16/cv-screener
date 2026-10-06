@@ -162,4 +162,12 @@ export class ApiService {
   indeedSync(): Observable<{ copied: string[]; count: number; cvs: string[] }> {
     return this.http.post<{ copied: string[]; count: number; cvs: string[] }>(`${this.base}/api/indeed/sync`, null);
   }
+
+  indeedArchive(): Observable<{ count: number; available: boolean }> {
+    return this.http.get<{ count: number; available: boolean }>(`${this.base}/api/indeed/downloads`);
+  }
+
+  indeedClear(): Observable<{ deleted: number; count: number }> {
+    return this.http.delete<{ deleted: number; count: number }>(`${this.base}/api/indeed/downloads`);
+  }
 }

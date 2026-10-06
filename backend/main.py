@@ -270,6 +270,38 @@ def api_indeed_sync():
     return {"copied": copied, "count": len(copied), "cvs": screener.list_cvs()}
 
 
+def _indeed_pdf_count() -> int:
+    if not INDEED_DOWNLOADS.is_dir():
+        return 0
+    return sum(1 for p in INDEED_DOWNLOADS.rglob("*.pdf") if p.is_file())
+
+
+@app.get("/api/indeed/downloads")
+def api_indeed_downloads():
+    """Numero di PDF presenti nell'archivio locale del downloader Indeed."""
+    return {"count": _indeed_pdf_count(), "available": INDEED_DOWNLOADS.is_dir()}
+
+
+@app.delete("/api/indeed/downloads")
+def api_indeed_clear_downloads():
+    """Elimina definitivamente tutti i PDF scaricati da Indeed (nessun cestino).
+
+    Opera solo sulla cartella fissa INDEED_DOWNLOADS, nessun percorso esterno.
+    """
+    if not INDEED_DOWNLOADS.is_dir():
+        raise HTTPException(status_code=404, detail="Cartella downloads non trovata. Nessun archivio da svuotare.")
+    deleted = 0
+    for pdf in INDEED_DOWNLOADS.rglob("*.pdf"):
+        if not pdf.is_file():
+            continue
+        try:
+            pdf.unlink()
+            deleted += 1
+        except OSError:
+            continue
+    return {"deleted": deleted, "count": _indeed_pdf_count()}
+
+
 # ── Frontend statico (build) ──────────────────────────
 if FRONTEND_DIST.is_dir():
     app.mount("/", StaticFiles(directory=str(FRONTEND_DIST), html=True), name="frontend")

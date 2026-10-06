@@ -97,6 +97,17 @@ export class App implements OnInit, OnDestroy {
     await this.loadJobs();
     await this.loadSessions();
     await this.loadReports();
+    await this.loadIndeedArchive();
+  }
+
+  async loadIndeedArchive(): Promise<void> {
+    try {
+      const r = await firstValueFrom(this.api.indeedArchive());
+      this.indeedArchive = r.count;
+      this.indeedArchiveAvailable = r.available;
+    } catch {
+      this.indeedArchiveAvailable = false;
+    }
   }
 
   onFilesSelected(event: Event): void {
@@ -399,6 +410,9 @@ export class App implements OnInit, OnDestroy {
 
   indeedMsg = '';
   indeedSyncing = false;
+  indeedArchive = 0;
+  indeedArchiveAvailable = false;
+  indeedClearing = false;
 
   async launchIndeed(): Promise<void> {
     this.indeedMsg = '';
@@ -418,11 +432,47 @@ export class App implements OnInit, OnDestroy {
       const r = await firstValueFrom(this.api.indeedSync());
       this.cvs = r.cvs;
       this.indeedMsg = r.count > 0 ? `${r.count} CV importato/i da Indeed.` : 'Nessun nuovo CV da Indeed.';
+      await this.loadIndeedArchive();
     } catch (e: unknown) {
       const err = e as { error?: { detail?: string } };
       this.indeedMsg = err?.error?.detail ?? 'Sync fallita.';
     } finally {
       this.indeedSyncing = false;
+    }
+  }
+
+  async clearIndeed(): Promise<void> {
+    if (!this.indeedArchiveAvailable) {
+      this.indeedMsg = 'Nessun archivio Indeed trovato.';
+      return;
+    }
+    if (this.indeedArchive === 0) {
+      this.indeedMsg = 'Archivio Indeed già vuoto.';
+      return;
+    }
+    const n = this.indeedArchive;
+    const ok = confirm(
+      `Eliminare definitivamente i ${n} PDF dall'archivio Indeed? ` +
+        'Non passano dal cestino, quindi non sono recuperabili.\n\n' +
+        'I CV già importati in CVs/ restano: per rimuoverli usa "Elimina tutti".'
+    );
+    if (!ok) {
+      return;
+    }
+    this.indeedClearing = true;
+    this.indeedMsg = '';
+    try {
+      const r = await firstValueFrom(this.api.indeedClear());
+      this.indeedArchive = r.count;
+      this.indeedMsg =
+        r.deleted > 0
+          ? `${r.deleted} PDF eliminati dall'archivio Indeed.`
+          : 'Nessun file da eliminare.';
+    } catch (e: unknown) {
+      const err = e as { error?: { detail?: string } };
+      this.indeedMsg = err?.error?.detail ?? 'Eliminazione archivio fallita.';
+    } finally {
+      this.indeedClearing = false;
     }
   }
 

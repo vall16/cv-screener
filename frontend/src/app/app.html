@@ -54,7 +54,15 @@
           <button (click)="syncIndeed()" [disabled]="indeedSyncing">
             {{ indeedSyncing ? 'Sincronizzazione…' : 'Sincronizza CV' }}
           </button>
+          @if (indeedArchiveAvailable) {
+            <button class="ghost danger" (click)="clearIndeed()" [disabled]="indeedClearing">
+              {{ indeedClearing ? 'Eliminazione…' : 'Svuota archivio' }}
+            </button>
+          }
         </div>
+        @if (indeedArchiveAvailable) {
+          <p class="muted">Archivio Indeed: {{ indeedArchive }} PDF in downloads (da qui li riprende "Sincronizza CV").</p>
+        }
         @if (indeedMsg) {
           <div class="banner info">{{ indeedMsg }}</div>
         }
