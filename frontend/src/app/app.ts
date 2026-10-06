@@ -115,6 +115,27 @@ export class App implements OnInit, OnDestroy {
     this.selectedFiles = Array.from(input.files ?? []);
   }
 
+  dragOver = false;
+
+  onDragOver(event: DragEvent): void {
+    event.preventDefault();
+    this.dragOver = true;
+  }
+
+  onDragLeave(event: DragEvent): void {
+    event.preventDefault();
+    this.dragOver = false;
+  }
+
+  onDrop(event: DragEvent): void {
+    event.preventDefault();
+    this.dragOver = false;
+    const files = Array.from(event.dataTransfer?.files ?? []);
+    if (files.length) {
+      this.selectedFiles = files;
+    }
+  }
+
   async upload(): Promise<void> {
     if (!this.selectedFiles.length) {
       return;

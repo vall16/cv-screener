@@ -110,6 +110,12 @@ h3 {
   border: 2px dashed #b9c2d4;
   border-radius: 12px;
   margin: 12px 0;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.dropzone.dragover {
+  border-color: #2563eb;
+  background: #eff6ff;
 }
 
 .dropzone input {
