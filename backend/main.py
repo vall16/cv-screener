@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path
 
 import markdown
+from docx import Document as DocxDocument
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
@@ -32,8 +33,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-_ALLOWED_EXT = {".pdf", ".txt"}
+_ALLOWED_EXT = {".pdf", ".txt", ".docx"}
 _MAX_UPLOAD_MB = 15
+
+
+def _docx_to_text(data: bytes) -> str:
+    doc = DocxDocument(io.BytesIO(data))
+    parts = [p.text for p in doc.paragraphs if p.text.strip()]
+    for table in doc.tables:
+        for row in table.rows:
+            parts.append("\t".join(cell.text.strip() for cell in row.cells))
+    return "\n".join(parts)
 
 
 @app.get("/api/health")
@@ -54,19 +64,27 @@ async def api_upload_cvs(files: list[UploadFile] = File(...)):
     for f in files:
         name = Path(f.filename or "").name
         if not name or Path(name).suffix.lower() not in _ALLOWED_EXT:
-            errors.append((name or "file") + ": formato non supportato (solo PDF/TXT)")
+            errors.append((name or "file") + ": formato non supportato (solo PDF/TXT/DOCX)")
             continue
         if f.size and f.size > _MAX_UPLOAD_MB * 1024 * 1024:
             errors.append(f"{name}: oltre {_MAX_UPLOAD_MB} MB")
             continue
-        target = screener.DEFAULT_CV_DIR / name
-        target.parent.mkdir(parents=True, exist_ok=True)
         chunk = await f.read()
         if len(chunk) > _MAX_UPLOAD_MB * 1024 * 1024:
             errors.append(f"{name}: oltre {_MAX_UPLOAD_MB} MB")
             continue
-        target.write_bytes(chunk)
-        saved.append(name)
+        screener.DEFAULT_CV_DIR.mkdir(parents=True, exist_ok=True)
+        if Path(name).suffix.lower() == ".docx":
+            txt_name = Path(name).stem + ".txt"
+            try:
+                text = _docx_to_text(chunk)
+                (screener.DEFAULT_CV_DIR / txt_name).write_text(text, encoding="utf-8")
+                saved.append(txt_name)
+            except Exception:
+                errors.append(f"{name}: conversione DOCX fallita")
+        else:
+            (screener.DEFAULT_CV_DIR / name).write_bytes(chunk)
+            saved.append(name)
     return {"saved": saved, "errors": errors, "cvs": screener.list_cvs()}
 
 

@@ -23,10 +23,10 @@
   @if (step === 'upload') {
     <section class="card">
       <h2>Carica i curriculum</h2>
-      <p class="muted">Formati supportati: PDF e TXT. Puoi selezionare più file contemporaneamente.</p>
+      <p class="muted">Formati supportati: PDF, TXT e DOCX. Puoi selezionare più file contemporaneamente.</p>
 
       <div class="dropzone">
-        <input id="files" type="file" multiple accept=".pdf,.txt" (change)="onFilesSelected($event)" />
+        <input id="files" type="file" multiple accept=".pdf,.txt,.docx" (change)="onFilesSelected($event)" />
         <label for="files">
           <span class="big">Clicca per scegliere i CV</span>
           <span class="muted">oppure trascinali qui</span>
