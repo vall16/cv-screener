@@ -84,9 +84,19 @@ def list_cvs(cv_dir: Path | None = None) -> list[str]:
     )
 
 
+def _safe_name(name: str) -> str | None:
+    """Rifiuta nomi con separatori o '..' (path traversal)."""
+    if not name or name != Path(name).name:
+        return None
+    return name
+
+
 def delete_cv(name: str, cv_dir: Path | None = None) -> bool:
+    safe = _safe_name(name)
+    if safe is None:
+        return False
     folder = Path(cv_dir) if cv_dir else DEFAULT_CV_DIR
-    target = folder / name
+    target = folder / safe
     if target.is_file() and target.suffix.lower() in (".pdf", ".txt"):
         target.unlink(missing_ok=True)
         return True
@@ -109,7 +119,10 @@ def list_reports(session_id: str | None = None) -> list[str]:
 
 
 def read_report(name: str, session_id: str | None = None) -> str | None:
-    target = _report_dir_for(session_id) / name
+    safe = _safe_name(name)
+    if safe is None:
+        return None
+    target = _report_dir_for(session_id) / safe
     if target.is_file() and target.suffix.lower() == ".md":
         return target.read_text(encoding="utf-8", errors="replace")
     return None
@@ -396,7 +409,12 @@ def _run(
         assert proc.stdout is not None
         for line in proc.stdout:
             _append_output(_jobs[job_id], line.rstrip("\n"))
-        proc.wait(timeout=3600)
+        try:
+            proc.wait(timeout=3600)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+            raise
         status = "done" if proc.returncode == 0 else "error"
         error = None if proc.returncode == 0 else f"opencode uscito con codice {proc.returncode}"
     except Exception as exc:  # noqa: BLE001
