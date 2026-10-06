@@ -169,7 +169,10 @@ def api_start_job(req: ScreeningReq):
         cvs = req.cvs if req.cvs else session.get("cvs", [])
         if not cvs:
             raise HTTPException(status_code=422, detail="La posizione non ha CV selezionati")
-        job = screener.start_job(req.profile.strip(), session_id=req.session_id, cv_names=cvs)
+        try:
+            job = screener.start_job(req.profile.strip(), session_id=req.session_id, cv_names=cvs)
+        except FileNotFoundError as e:
+            raise HTTPException(status_code=422, detail=str(e))
     else:
         if not screener.list_cvs():
             raise HTTPException(status_code=422, detail="Nessun CV presente nella cartella CVs")

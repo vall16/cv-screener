@@ -459,6 +459,23 @@ button.report-item.classifica span:first-child {
   font-size: 14px;
 }
 
+.btn-csv {
+  display: inline-block;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--brand);
+  text-decoration: none;
+  background: #f8fafc;
+  transition: background 0.15s;
+}
+
+.btn-csv:hover {
+  background: #eff6ff;
+}
+
 .cand-table-wrap {
   overflow-x: auto;
   margin-top: 14px;

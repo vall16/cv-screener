@@ -72,7 +72,7 @@ export interface CandidateList {
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
-  private readonly base = this.apiBase();
+  readonly base = this.apiBase();
 
   constructor(private http: HttpClient) {}
 

@@ -289,6 +289,10 @@ def start_job(
 ) -> dict:
     folder = Path(cv_dir) if cv_dir else DEFAULT_CV_DIR
     folder.mkdir(parents=True, exist_ok=True)
+    if cv_names:
+        cv_names = [n for n in cv_names if (folder / n).is_file()]
+        if not cv_names:
+            raise FileNotFoundError("Nessun CV valido nella selezione (tutti i file sono stati rimossi)")
     job_id = uuid.uuid4().hex[:12]
     with _lock:
         _jobs[job_id] = {

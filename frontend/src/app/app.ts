@@ -40,6 +40,12 @@ export class App implements OnInit, OnDestroy {
   candSortField: 'score' | 'name' = 'score';
   candSortDir: 'asc' | 'desc' = 'desc';
 
+  csvUrl(): string {
+    const base = this.api.base;
+    const s = this.activeSessionId ? `?session=${encodeURIComponent(this.activeSessionId)}` : '';
+    return `${base}/api/reports/summary/csv${s}`;
+  }
+
   // Sessioni (posizioni)
   sessions: Session[] = [];
   activeSessionId = ''; // '' = report legacy (senza posizione)
@@ -288,12 +294,15 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
+  private pollErrors = 0;
+
   async poll(): Promise<void> {
     if (!this.job) {
       return;
     }
     try {
       const r = await firstValueFrom(this.api.getJob(this.job.id));
+      this.pollErrors = 0;
       this.job = r.job;
       if (this.job.status !== 'running') {
         this.stopPolling();
@@ -302,7 +311,10 @@ export class App implements OnInit, OnDestroy {
         await this.loadJobs();
       }
     } catch {
-      this.stopPolling();
+      this.pollErrors++;
+      if (this.pollErrors >= 5) {
+        this.stopPolling();
+      }
     }
   }
 
