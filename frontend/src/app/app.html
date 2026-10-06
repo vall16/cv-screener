@@ -250,6 +250,7 @@
               <input type="number" min="0" max="100" [(ngModel)]="candMinScore" />
             </label>
             <input class="cand-search" type="text" placeholder="Cerca per nome…" [(ngModel)]="candSearch" />
+            <a class="btn-csv" [href]="csvUrl()" download>⬇ CSV</a>
           </div>
         </div>
 

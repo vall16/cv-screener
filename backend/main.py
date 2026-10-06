@@ -217,6 +217,26 @@ def api_reports_summary(session: str | None = None):
     return {"candidates": screener.get_candidates_summary(session)}
 
 
+@app.get("/api/reports/summary/csv")
+def api_reports_csv(session: str | None = None):
+    """Esporta la classifica in CSV."""
+    import csv
+    import io as _io
+
+    candidates = screener.get_candidates_summary(session)
+    buf = _io.StringIO()
+    writer = csv.writer(buf, delimiter=";")
+    writer.writerow(["Nome", "Voto", "Giudizio", "Esperienza", "Fit tecnico"])
+    for c in candidates:
+        writer.writerow([c["name"], c.get("score", ""), c.get("verdict", ""), c.get("experience", ""), c.get("fit", "")])
+    buf.seek(0)
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="classifica.csv"'},
+    )
+
+
 @app.get("/api/reports/{name}")
 def api_get_report(name: str, session: str | None = None):
     content = screener.read_report(name, session)
