@@ -1,4 +1,5 @@
 """API FastAPI del progetto cv-screener."""
+import hashlib
 import io
 import os
 import shutil
@@ -321,18 +322,57 @@ def api_indeed_launch():
     return {"ok": True, "message": "Finestra terminale aperta. Loggati su Indeed Employer e segui il menu."}
 
 
+def _sha256(path: Path) -> str:
+    """Hash SHA-256 del file, letto a chunk da 1 MB."""
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
 @app.post("/api/indeed/sync")
 def api_indeed_sync():
-    """Copia i PDF scaricati da Indeed nella cartella CVs."""
+    """Copia i PDF scaricati da Indeed nella cartella CVs.
+
+    Salva i file già presenti per nome e anche quelli il cui contenuto
+    è identico a un CV già importato (stesso candidato, nome diverso).
+    """
     if not INDEED_DOWNLOADS.is_dir():
         raise HTTPException(status_code=404, detail="Cartella downloads non trovata. Esegui prima il download da Indeed.")
+    cv_dir = screener.DEFAULT_CV_DIR
+    cv_dir.mkdir(parents=True, exist_ok=True)
+    known: set[str] = set()
+    for existing in cv_dir.iterdir():
+        if existing.is_file() and existing.suffix.lower() == ".pdf":
+            try:
+                known.add(_sha256(existing))
+            except OSError:
+                continue
     copied = []
+    skipped = []
     for pdf in INDEED_DOWNLOADS.rglob("*.pdf"):
-        target = screener.DEFAULT_CV_DIR / pdf.name
-        if not target.exists():
-            shutil.copy2(pdf, target)
-            copied.append(pdf.name)
-    return {"copied": copied, "count": len(copied), "cvs": screener.list_cvs()}
+        if not pdf.is_file():
+            continue
+        if (cv_dir / pdf.name).exists():
+            continue
+        try:
+            digest = _sha256(pdf)
+        except OSError:
+            continue
+        if digest in known:
+            skipped.append(pdf.name)
+            continue
+        shutil.copy2(pdf, cv_dir / pdf.name)
+        known.add(digest)
+        copied.append(pdf.name)
+    return {
+        "copied": copied,
+        "count": len(copied),
+        "skipped": skipped,
+        "duplicates": len(skipped),
+        "cvs": screener.list_cvs(),
+    }
 
 
 def _indeed_pdf_count() -> int:
@@ -377,6 +417,15 @@ def api_indeed_clear_downloads():
 
 # ── Frontend statico (build) ──────────────────────────
 if FRONTEND_DIST.is_dir():
+    if (FRONTEND_DIST / "index.html").is_file():
+        @app.get("/", include_in_schema=False)
+        def index():
+            """Serve index.html senza cache: i bundle hanno nomi hash, l'HTML no."""
+            return FileResponse(
+                FRONTEND_DIST / "index.html",
+                headers={"Cache-Control": "no-store"},
+            )
+
     app.mount("/", StaticFiles(directory=str(FRONTEND_DIST), html=True), name="frontend")
 
 

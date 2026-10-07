@@ -467,7 +467,15 @@ export class App implements OnInit, OnDestroy {
     try {
       const r = await firstValueFrom(this.api.indeedSync());
       this.cvs = r.cvs;
-      this.indeedMsg = r.count > 0 ? `${r.count} CV importato/i da Indeed.` : 'Nessun nuovo CV da Indeed.';
+      if (r.count > 0 && r.duplicates > 0) {
+        this.indeedMsg = `${r.count} CV importati, ${r.duplicates} duplicati saltati.`;
+      } else if (r.count > 0) {
+        this.indeedMsg = `${r.count} CV importato/i da Indeed.`;
+      } else if (r.duplicates > 0) {
+        this.indeedMsg = `Nessun nuovo CV: ${r.duplicates} duplicati saltati.`;
+      } else {
+        this.indeedMsg = 'Nessun nuovo CV da Indeed.';
+      }
       await this.loadIndeedArchive();
     } catch (e: unknown) {
       const err = e as { error?: { detail?: string } };

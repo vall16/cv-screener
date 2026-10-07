@@ -159,8 +159,11 @@ export class ApiService {
     return this.http.post<{ ok: boolean; message: string }>(`${this.base}/api/indeed/launch`, null);
   }
 
-  indeedSync(): Observable<{ copied: string[]; count: number; cvs: string[] }> {
-    return this.http.post<{ copied: string[]; count: number; cvs: string[] }>(`${this.base}/api/indeed/sync`, null);
+  indeedSync(): Observable<{ copied: string[]; count: number; skipped: string[]; duplicates: number; cvs: string[] }> {
+    return this.http.post<{ copied: string[]; count: number; skipped: string[]; duplicates: number; cvs: string[] }>(
+      `${this.base}/api/indeed/sync`,
+      null
+    );
   }
 
   indeedArchive(): Observable<{ count: number; available: boolean }> {
