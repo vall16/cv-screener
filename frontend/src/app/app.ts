@@ -2,7 +2,7 @@ import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
-import { ApiService, Candidate, Job, Session } from './api.service';
+import { ApiService, Candidate, Job, Session, ProfileTemplate } from './api.service';
 import { renderMarkdown } from './markdown';
 
 type Step = 'upload' | 'run' | 'results';
@@ -23,6 +23,7 @@ export class App implements OnInit, OnDestroy {
   uploading = false;
 
   profile = '';
+  templates: ProfileTemplate[] = [];
   job: Job | null = null;
   jobs: Job[] = [];
   history: Job[] = [];
@@ -59,6 +60,7 @@ export class App implements OnInit, OnDestroy {
 
   async ngOnInit(): Promise<void> {
     await this.refreshAll();
+    await this.loadTemplates();
     if (!this.job || this.job.status !== 'running') {
       const running = this.history.find((j) => j.status === 'running');
       if (running) {
@@ -306,6 +308,7 @@ export class App implements OnInit, OnDestroy {
       this.job = r.job;
       if (this.job.status !== 'running') {
         this.stopPolling();
+        this.notifyJobComplete(this.job);
         if (this.job.session_id) this.activeSessionId = this.job.session_id;
         await this.loadReports();
         await this.loadJobs();
@@ -525,6 +528,52 @@ export class App implements OnInit, OnDestroy {
         return 'Completato';
       default:
         return 'Errore';
+    }
+  }
+
+  // --- Template profilo ---
+
+  async loadTemplates(): Promise<void> {
+    try {
+      const r = await firstValueFrom(this.api.listProfiles());
+      this.templates = r.profiles;
+    } catch {
+      this.templates = [];
+    }
+  }
+
+  applyTemplate(event: Event): void {
+    const sel = event.target as HTMLSelectElement;
+    const tpl = this.templates.find(t => t.id === sel.value);
+    if (tpl) {
+      this.profile = tpl.profile;
+    }
+    sel.value = '';
+  }
+
+  async saveTemplate(): Promise<void> {
+    if (!this.profile.trim()) return;
+    const name = window.prompt('Nome del template:', this.newSessionName || 'Profilo');
+    if (!name?.trim()) return;
+    try {
+      await firstValueFrom(this.api.saveProfile(name.trim(), this.profile.trim()));
+      await this.loadTemplates();
+    } catch {
+      // ignore
+    }
+  }
+
+  // --- Notifica browser ---
+
+  private notifyJobComplete(job: Job): void {
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'default') {
+      Notification.requestPermission();
+      return;
+    }
+    if (Notification.permission === 'granted') {
+      const label = job.status === 'done' ? '✓ Completato' : '✗ Errore';
+      new Notification('CV Screener', { body: `Screening ${label}` });
     }
   }
 }

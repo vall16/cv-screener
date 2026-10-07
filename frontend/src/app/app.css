@@ -643,3 +643,49 @@ select {
     grid-template-columns: 1fr;
   }
 }
+
+.profile-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.profile-row input {
+  flex: 1;
+}
+
+.tpl-select {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 13px;
+  background: #fff;
+  max-width: 180px;
+}
+
+.md-table-wrap {
+  overflow-x: auto;
+  margin: 12px 0;
+}
+
+.md-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.md-table th,
+.md-table td {
+  border: 1px solid var(--line);
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.md-table th {
+  background: #f1f5f9;
+  font-weight: 600;
+}
+
+.md-table tr:nth-child(even) {
+  background: #f8fafc;
+}

@@ -115,7 +115,16 @@
         </label>
         <label class="field">
           <span>Profilo target</span>
-          <input [(ngModel)]="profile" placeholder="es. senior backend developer, 5+ anni, Go/Python" />
+          <div class="profile-row">
+            <input [(ngModel)]="profile" placeholder="es. senior backend developer, 5+ anni, Go/Python" />
+            <select class="tpl-select" (change)="applyTemplate($event)">
+              <option value="">Template…</option>
+              @for (t of templates; track t.id) {
+                <option [value]="t.id">{{ t.name }}</option>
+              }
+            </select>
+            <button class="ghost" (click)="saveTemplate()" title="Salva come template">💾</button>
+          </div>
         </label>
 
         <div class="pos-cvs">

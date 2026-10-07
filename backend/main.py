@@ -141,6 +141,30 @@ def api_export_cvs():
     )
 
 
+class ProfileReq(BaseModel):
+    name: str
+    profile: str
+
+
+@app.get("/api/profiles")
+def api_list_profiles():
+    return {"profiles": screener.list_profiles()}
+
+
+@app.post("/api/profiles")
+def api_save_profile(req: ProfileReq):
+    if not req.name.strip() or not req.profile.strip():
+        raise HTTPException(status_code=422, detail="Nome e profilo obbligatori")
+    return screener.save_profile(req.name.strip(), req.profile.strip())
+
+
+@app.delete("/api/profiles/{pid}")
+def api_delete_profile(pid: str):
+    if not screener.delete_profile(pid):
+        raise HTTPException(status_code=404, detail="Template non trovato")
+    return {"ok": True}
+
+
 class ScreeningReq(BaseModel):
     profile: str
     session_id: str | None = None

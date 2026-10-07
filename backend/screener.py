@@ -15,9 +15,11 @@ DEFAULT_CV_DIR = BASE_DIR / "CVs"
 REPORT_DIR_NAME = "_report"
 _JOBS_FILE = Path(__file__).resolve().parent / "jobs.json"
 _SESSIONS_FILE = Path(__file__).resolve().parent / "sessions.json"
+_PROFILES_FILE = Path(__file__).resolve().parent / "profiles.json"
 
 _jobs: dict[str, dict] = {}
 _sessions: dict[str, dict] = {}
+_profiles: dict[str, dict] = {}
 _lock = threading.Lock()
 _MAX_OUTPUT_LINES = 500
 
@@ -66,8 +68,50 @@ def _load_sessions() -> None:
         pass
 
 
+def _save_profiles() -> None:
+    try:
+        _PROFILES_FILE.write_text(json.dumps(_profiles, ensure_ascii=False, indent=2), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def _load_profiles() -> None:
+    global _profiles
+    if not _PROFILES_FILE.is_file():
+        return
+    try:
+        data = json.loads(_PROFILES_FILE.read_text(encoding="utf-8"))
+        for pid, p in data.items():
+            _profiles[pid] = p
+    except (json.JSONDecodeError, OSError):
+        pass
+
+
 _load_jobs()
 _load_sessions()
+_load_profiles()
+
+
+def list_profiles() -> list[dict]:
+    with _lock:
+        return sorted(_profiles.values(), key=lambda p: p.get("name", ""), )
+
+
+def save_profile(name: str, profile: str) -> dict:
+    pid = _slugify(name)
+    with _lock:
+        _profiles[pid] = {"id": pid, "name": name, "profile": profile}
+        _save_profiles()
+        return _profiles[pid]
+
+
+def delete_profile(pid: str) -> bool:
+    with _lock:
+        if pid in _profiles:
+            del _profiles[pid]
+            _save_profiles()
+            return True
+    return False
 
 
 def _now_iso() -> str:

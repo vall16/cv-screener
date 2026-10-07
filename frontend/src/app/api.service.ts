@@ -170,4 +170,22 @@ export class ApiService {
   indeedClear(): Observable<{ deleted: number; count: number }> {
     return this.http.delete<{ deleted: number; count: number }>(`${this.base}/api/indeed/downloads`);
   }
+
+  listProfiles(): Observable<{ profiles: ProfileTemplate[] }> {
+    return this.http.get<{ profiles: ProfileTemplate[] }>(`${this.base}/api/profiles`);
+  }
+
+  saveProfile(name: string, profile: string): Observable<ProfileTemplate> {
+    return this.http.post<ProfileTemplate>(`${this.base}/api/profiles`, { name, profile });
+  }
+
+  deleteProfile(pid: string): Observable<{ ok: boolean }> {
+    return this.http.delete<{ ok: boolean }>(`${this.base}/api/profiles/${pid}`);
+  }
+}
+
+export interface ProfileTemplate {
+  id: string;
+  name: string;
+  profile: string;
 }

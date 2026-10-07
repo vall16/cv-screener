@@ -6,6 +6,9 @@ export function renderMarkdown(md: string): string {
   const out: string[] = [];
   let inList = false;
   let para: string[] = [];
+  let inTable = false;
+  let tableRows: string[][] = [];
+  let tableHeaderDone = false;
 
   const flushPara = () => {
     if (para.length) {
@@ -19,11 +22,62 @@ export function renderMarkdown(md: string): string {
       inList = false;
     }
   };
+  const flushTable = () => {
+    if (!inTable) return;
+    inTable = false;
+    tableHeaderDone = false;
+    if (tableRows.length === 0) return;
+    const [header, ...body] = tableRows;
+    let html = '<div class="md-table-wrap"><table class="md-table"><thead><tr>';
+    for (const cell of header) html += `<th>${cell}</th>`;
+    html += '</tr></thead><tbody>';
+    for (const row of body) {
+      html += '<tr>';
+      for (const cell of row) html += `<td>${cell}</td>`;
+      html += '</tr>';
+    }
+    html += '</tbody></table></div>';
+    out.push(html);
+    tableRows = [];
+  };
+
+  const parseTableRow = (line: string): string[] => {
+    // Split by |, remove first and last empty elements
+    const parts = line.split('|').map(c => c.trim());
+    // Remove leading/trailing empty strings from split
+    if (parts[0] === '') parts.shift();
+    if (parts[parts.length - 1] === '') parts.pop();
+    return parts;
+  };
+
+  const isSeparatorRow = (line: string): boolean => {
+    // Matches |---|---| or | --- | --- |
+    return /^\|?[\s:-]+\|/.test(line) && /^[\s|:-]+$/.test(line);
+  };
 
   for (const raw of lines) {
     const line = raw.trimEnd();
     const t = line.trim();
     let m: RegExpExecArray | null;
+
+    // Table detection
+    if (t.startsWith('|') && t.endsWith('|')) {
+      if (isSeparatorRow(t)) {
+        // Separator row: mark header done, skip
+        tableHeaderDone = true;
+        continue;
+      }
+      flushPara();
+      closeList();
+      if (!inTable) {
+        inTable = true;
+        tableRows = [];
+      }
+      tableRows.push(parseTableRow(t));
+      continue;
+    } else if (inTable) {
+      flushTable();
+    }
 
     if ((m = /^```/.exec(t))) {
       flushPara();
@@ -59,6 +113,7 @@ export function renderMarkdown(md: string): string {
   }
   flushPara();
   closeList();
+  flushTable();
 
   return out
     .join('\n')
