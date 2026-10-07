@@ -349,21 +349,29 @@ def api_indeed_downloads():
 
 @app.delete("/api/indeed/downloads")
 def api_indeed_clear_downloads():
-    """Elimina definitivamente tutti i PDF scaricati da Indeed (nessun cestino).
+    """Svuota la cartella downloads: PDF + stats.json + report.
 
     Opera solo sulla cartella fissa INDEED_DOWNLOADS, nessun percorso esterno.
     """
     if not INDEED_DOWNLOADS.is_dir():
         raise HTTPException(status_code=404, detail="Cartella downloads non trovata. Nessun archivio da svuotare.")
     deleted = 0
-    for pdf in INDEED_DOWNLOADS.rglob("*.pdf"):
-        if not pdf.is_file():
+    for item in INDEED_DOWNLOADS.rglob("*"):
+        if not item.is_file():
             continue
-        try:
-            pdf.unlink()
-            deleted += 1
-        except OSError:
-            continue
+        if item.suffix.lower() in (".pdf", ".json", ".txt"):
+            try:
+                item.unlink()
+                deleted += 1
+            except OSError:
+                continue
+    # Rimuovi sottocartelle vuote
+    for d in INDEED_DOWNLOADS.rglob("*"):
+        if d.is_dir() and not any(d.iterdir()):
+            try:
+                d.rmdir()
+            except OSError:
+                pass
     return {"deleted": deleted, "count": _indeed_pdf_count()}
 
 
