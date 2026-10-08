@@ -220,6 +220,7 @@
               <span class="file">{{ j.profile }}</span>
               <span class="pill" [class]="j.status">{{ statusLabel(j) }}</span>
               <button class="ghost" (click)="openJob(j)">apri</button>
+              <button class="ghost danger" (click)="deleteJob(j)">elimina</button>
             </li>
           }
         </ul>

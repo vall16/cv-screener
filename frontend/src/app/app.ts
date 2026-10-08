@@ -490,6 +490,16 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
+  async deleteJob(j: Job): Promise<void> {
+    if (!confirm(`Eliminare lo screening "${j.profile}"?`)) return;
+    try {
+      await firstValueFrom(this.api.deleteJob(j.id));
+      await this.loadJobs();
+    } catch {
+      this.uploadError = 'Impossibile eliminare lo screening.';
+    }
+  }
+
   indeedMsg = '';
   indeedSyncing = false;
   indeedArchive = 0;

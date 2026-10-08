@@ -123,6 +123,10 @@ export class ApiService {
     return this.http.get<JobResult>(`${this.base}/api/jobs/${id}`);
   }
 
+  deleteJob(id: string): Observable<{ ok: boolean }> {
+    return this.http.delete<{ ok: boolean }>(`${this.base}/api/jobs/${id}`);
+  }
+
   listSessions(): Observable<SessionList> {
     return this.http.get<SessionList>(`${this.base}/api/sessions`);
   }

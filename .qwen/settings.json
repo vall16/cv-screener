@@ -25,7 +25,9 @@
       "Bash(format-list)",
       "Bash(tasklist *)",
       "Bash(get-nettcpconnection *)",
-      "Bash(get-process *)"
+      "Bash(get-process *)",
+      "Bash(opencode *)",
+      "Bash(npm *)"
     ]
   },
   "$version": 4

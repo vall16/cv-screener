@@ -372,6 +372,15 @@ def get_jobs() -> list[dict]:
         return sorted(_jobs.values(), key=lambda j: j["started"], reverse=True)
 
 
+def delete_job(job_id: str) -> bool:
+    with _lock:
+        if job_id not in _jobs:
+            return False
+        del _jobs[job_id]
+        _save_jobs()
+    return True
+
+
 def start_job(
     profile: str,
     cv_dir: Path | None = None,
