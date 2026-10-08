@@ -16,10 +16,12 @@ REPORT_DIR_NAME = "_report"
 _JOBS_FILE = Path(__file__).resolve().parent / "jobs.json"
 _SESSIONS_FILE = Path(__file__).resolve().parent / "sessions.json"
 _PROFILES_FILE = Path(__file__).resolve().parent / "profiles.json"
+_SHORTLIST_FILE = Path(__file__).resolve().parent / "shortlist.json"
 
 _jobs: dict[str, dict] = {}
 _sessions: dict[str, dict] = {}
 _profiles: dict[str, dict] = {}
+_shortlist: dict[str, dict[str, str]] = {}  # {session_id: {filename: status}}
 _lock = threading.Lock()
 _MAX_OUTPUT_LINES = 500
 
@@ -75,6 +77,23 @@ def _save_profiles() -> None:
         pass
 
 
+def _save_shortlist() -> None:
+    try:
+        _SHORTLIST_FILE.write_text(json.dumps(_shortlist, ensure_ascii=False, indent=2), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def _load_shortlist() -> None:
+    global _shortlist
+    if not _SHORTLIST_FILE.is_file():
+        return
+    try:
+        _shortlist = json.loads(_SHORTLIST_FILE.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        _shortlist = {}
+
+
 def _load_profiles() -> None:
     global _profiles
     if not _PROFILES_FILE.is_file():
@@ -90,6 +109,7 @@ def _load_profiles() -> None:
 _load_jobs()
 _load_sessions()
 _load_profiles()
+_load_shortlist()
 
 
 def list_profiles() -> list[dict]:
@@ -112,6 +132,33 @@ def delete_profile(pid: str) -> bool:
             _save_profiles()
             return True
     return False
+
+
+# ── Shortlist ─────────────────────────────────────────
+_VALID_STATUSES = {"", "interview", "rejected", "offer"}
+
+
+def get_shortlist(session_id: str | None = None) -> dict[str, str]:
+    with _lock:
+        if session_id:
+            return dict(_shortlist.get(session_id, {}))
+        # merge tutte le sessioni
+        merged: dict[str, str] = {}
+        for s in _shortlist.values():
+            merged.update(s)
+        return merged
+
+
+def set_shortlist_status(session_id: str, filename: str, status: str) -> dict[str, str]:
+    if status not in _VALID_STATUSES:
+        raise ValueError(f"Stato non valido: {status}")
+    with _lock:
+        if status == "":
+            _shortlist.get(session_id, {}).pop(filename, None)
+        else:
+            _shortlist.setdefault(session_id, {})[filename] = status
+        _save_shortlist()
+        return dict(_shortlist.get(session_id, {}))
 
 
 def _now_iso() -> str:

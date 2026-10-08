@@ -36,10 +36,12 @@ export class App implements OnInit, OnDestroy {
   // Tabella candidati (risultati interattivi)
   candidates: Candidate[] = [];
   candFilterGiudizio = 'all'; // 'all' | 'Si passa' | 'Da valutare' | 'No'
+  candFilterStatus = 'all'; // 'all' | 'interview' | 'rejected' | 'offer' | 'none'
   candMinScore = 0;
   candSearch = '';
   candSortField: 'score' | 'name' = 'score';
   candSortDir: 'asc' | 'desc' = 'desc';
+  shortlist: Record<string, string> = {};
 
   csvUrl(): string {
     const base = this.api.base;
@@ -358,6 +360,43 @@ export class App implements OnInit, OnDestroy {
     } catch {
       this.candidates = [];
     }
+    await this.loadShortlist();
+  }
+
+  async loadShortlist(): Promise<void> {
+    const session = this.activeSessionId || undefined;
+    try {
+      const r = await firstValueFrom(this.api.getShortlist(session));
+      this.shortlist = r.shortlist;
+    } catch {
+      this.shortlist = {};
+    }
+  }
+
+  async setCandidateStatus(file: string, status: string): Promise<void> {
+    if (!this.activeSessionId) return;
+    // optimistic update
+    if (status === '') {
+      delete this.shortlist[file];
+    } else {
+      this.shortlist[file] = status;
+    }
+    try {
+      const r = await firstValueFrom(this.api.setShortlistStatus(this.activeSessionId, file, status));
+      this.shortlist = r.shortlist;
+    } catch {
+      // revert
+      await this.loadShortlist();
+    }
+  }
+
+  shortlistStatusLabel(s: string): string {
+    switch (s) {
+      case 'interview': return 'Da intervistare';
+      case 'rejected': return 'Scartato';
+      case 'offer': return 'Offerta';
+      default: return '';
+    }
   }
 
   // Candidati dopo filtri + ordinamento (ricomputato a ogni change detection).
@@ -365,6 +404,13 @@ export class App implements OnInit, OnDestroy {
     let list = this.candidates;
     if (this.candFilterGiudizio !== 'all') {
       list = list.filter((c) => c.giudizio === this.candFilterGiudizio);
+    }
+    if (this.candFilterStatus !== 'all') {
+      list = list.filter((c) => {
+        const s = this.shortlist[c.file] || '';
+        if (this.candFilterStatus === 'none') return !s;
+        return s === this.candFilterStatus;
+      });
     }
     if (this.candMinScore > 0) {
       list = list.filter((c) => c.score !== null && c.score >= this.candMinScore);

@@ -254,6 +254,12 @@
               <button class="chip eval" [class.active]="candFilterGiudizio === 'Da valutare'" (click)="candFilterGiudizio = 'Da valutare'">Da valutare ({{ candCounts().eval }})</button>
               <button class="chip no" [class.active]="candFilterGiudizio === 'No'" (click)="candFilterGiudizio = 'No'">No ({{ candCounts().no }})</button>
             </div>
+            <div class="chips">
+              <button class="chip" [class.active]="candFilterStatus === 'all'" (click)="candFilterStatus = 'all'">Tutti</button>
+              <button class="chip interview" [class.active]="candFilterStatus === 'interview'" (click)="candFilterStatus = 'interview'">Da intervistare</button>
+              <button class="chip offer" [class.active]="candFilterStatus === 'offer'" (click)="candFilterStatus = 'offer'">Offerta</button>
+              <button class="chip rejected" [class.active]="candFilterStatus === 'rejected'" (click)="candFilterStatus = 'rejected'">Scartati</button>
+            </div>
             <label class="cand-min">
               Voto min
               <input type="number" min="0" max="100" [(ngModel)]="candMinScore" />
@@ -270,6 +276,7 @@
                 <th class="sortable" (click)="toggleSort('name')" [class.sorted]="candSortField === 'name'">Nome{{ sortArrow('name') }}</th>
                 <th class="sortable num" (click)="toggleSort('score')" [class.sorted]="candSortField === 'score'">Voto{{ sortArrow('score') }}</th>
                 <th>Giudizio</th>
+                <th>Stato</th>
                 <th>Esperienza</th>
               </tr>
             </thead>
@@ -285,12 +292,20 @@
                       <span class="muted">—</span>
                     }
                   </td>
+                  <td (click)="$event.stopPropagation()">
+                    <select class="status-select" [value]="shortlist[c.file] || ''" (change)="setCandidateStatus(c.file, $any($event.target).value)">
+                      <option value="">—</option>
+                      <option value="interview">Da intervistare</option>
+                      <option value="offer">Offerta</option>
+                      <option value="rejected">Scartato</option>
+                    </select>
+                  </td>
                   <td class="cand-exp" [title]="c.esperienza ?? ''">{{ c.esperienza ?? '—' }}</td>
                 </tr>
               }
               @empty {
                 <tr>
-                  <td colspan="4" class="muted cand-empty">Nessun candidato corrisponde ai filtri.</td>
+                  <td colspan="5" class="muted cand-empty">Nessun candidato corrisponde ai filtri.</td>
                 </tr>
               }
             </tbody>

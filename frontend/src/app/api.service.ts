@@ -185,6 +185,15 @@ export class ApiService {
   deleteProfile(pid: string): Observable<{ ok: boolean }> {
     return this.http.delete<{ ok: boolean }>(`${this.base}/api/profiles/${pid}`);
   }
+
+  getShortlist(session?: string): Observable<{ shortlist: Record<string, string> }> {
+    const q = session ? `?session=${encodeURIComponent(session)}` : '';
+    return this.http.get<{ shortlist: Record<string, string> }>(`${this.base}/api/shortlist${q}`);
+  }
+
+  setShortlistStatus(sessionId: string, file: string, status: string): Observable<{ shortlist: Record<string, string> }> {
+    return this.http.put<{ shortlist: Record<string, string> }>(`${this.base}/api/shortlist`, { session_id: sessionId, file, status });
+  }
 }
 
 export interface ProfileTemplate {

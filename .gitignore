@@ -12,6 +12,7 @@ venv/
 backend/jobs.json
 backend/sessions.json
 backend/profiles.json
+backend/shortlist.json
 
 # ── Node / frontend ─────────────────────────────────────
 node_modules/

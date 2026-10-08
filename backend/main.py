@@ -142,6 +142,26 @@ def api_export_cvs():
     )
 
 
+class ShortlistReq(BaseModel):
+    session_id: str
+    file: str
+    status: str
+
+
+@app.get("/api/shortlist")
+def api_get_shortlist(session: str | None = None):
+    return {"shortlist": screener.get_shortlist(session)}
+
+
+@app.put("/api/shortlist")
+def api_set_shortlist(req: ShortlistReq):
+    try:
+        result = screener.set_shortlist_status(req.session_id, req.file, req.status)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    return {"shortlist": result}
+
+
 class ProfileReq(BaseModel):
     name: str
     profile: str
@@ -389,9 +409,9 @@ def api_indeed_downloads():
 
 @app.delete("/api/indeed/downloads")
 def api_indeed_clear_downloads():
-    """Svuota la cartella downloads: PDF + stats.json + report.
+    """Svuota la cartella downloads e resetta il checkpoint del downloader.
 
-    Opera solo sulla cartella fissa INDEED_DOWNLOADS, nessun percorso esterno.
+    Opera solo sulla cartella fissa INDEED_DOWNLOADS e sul checkpoint in logs/.
     """
     if not INDEED_DOWNLOADS.is_dir():
         raise HTTPException(status_code=404, detail="Cartella downloads non trovata. Nessun archivio da svuotare.")
@@ -412,6 +432,10 @@ def api_indeed_clear_downloads():
                 d.rmdir()
             except OSError:
                 pass
+    # Resetta il checkpoint: senza questo il downloader salta i candidati già visti
+    checkpoint = INDEED_DIR / "logs" / "checkpoint_unified.json"
+    if checkpoint.is_file():
+        checkpoint.write_text('{"downloaded_names": [], "downloaded_ids": [], "completed_jobs": []}')
     return {"deleted": deleted, "count": _indeed_pdf_count()}
 
 

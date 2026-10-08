@@ -434,6 +434,36 @@ button.report-item.classifica span:first-child {
   border-color: var(--err);
 }
 
+.chip.interview.active {
+  background: #2563eb;
+  border-color: #2563eb;
+}
+
+.chip.offer.active {
+  background: #059669;
+  border-color: #059669;
+}
+
+.chip.rejected.active {
+  background: #6b7280;
+  border-color: #6b7280;
+}
+
+.status-select {
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 12px;
+  background: #fff;
+  cursor: pointer;
+  max-width: 140px;
+}
+
+.status-select:focus {
+  outline: 2px solid var(--brand);
+  border-color: var(--brand);
+}
+
 .cand-min {
   display: flex;
   align-items: center;
