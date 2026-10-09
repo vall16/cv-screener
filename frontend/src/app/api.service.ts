@@ -178,6 +178,20 @@ export class ApiService {
     return this.http.delete<{ deleted: number; count: number }>(`${this.base}/api/indeed/downloads`);
   }
 
+  indeedStream(offset: number): Observable<{ lines: string[]; total: number; running: boolean }> {
+    return this.http.get<{ lines: string[]; total: number; running: boolean }>(
+      `${this.base}/api/indeed/stream?offset=${offset}`
+    );
+  }
+
+  indeedInput(text: string): Observable<{ ok: boolean }> {
+    return this.http.post<{ ok: boolean }>(`${this.base}/api/indeed/input`, { text });
+  }
+
+  indeedStop(): Observable<{ ok: boolean }> {
+    return this.http.post<{ ok: boolean }>(`${this.base}/api/indeed/stop`, null);
+  }
+
   listProfiles(): Observable<{ profiles: ProfileTemplate[] }> {
     return this.http.get<{ profiles: ProfileTemplate[] }>(`${this.base}/api/profiles`);
   }

@@ -499,29 +499,39 @@ def _run(
         "--format", "default",
     ]
     env = os.environ.copy()
-    try:
-        proc = subprocess.Popen(
-            cmd,
-            cwd=str(BASE_DIR),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            env=env,
-        )
-        assert proc.stdout is not None
-        for line in proc.stdout:
-            _append_output(_jobs[job_id], line.rstrip("\n"))
+    max_attempts = 3
+    status = "error"
+    error: str | None = None
+    for attempt in range(1, max_attempts + 1):
+        if attempt > 1:
+            _append_output(_jobs[job_id], f"\n[retry {attempt}/{max_attempts}] opencode fallito, rilancio…\n")
         try:
-            proc.wait(timeout=3600)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait()
-            raise
-        status = "done" if proc.returncode == 0 else "error"
-        error = None if proc.returncode == 0 else f"opencode uscito con codice {proc.returncode}"
-    except Exception as exc:  # noqa: BLE001
-        status = "error"
-        error = str(exc)
+            proc = subprocess.Popen(
+                cmd,
+                cwd=str(BASE_DIR),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                env=env,
+            )
+            assert proc.stdout is not None
+            for line in proc.stdout:
+                _append_output(_jobs[job_id], line.rstrip("\n"))
+            try:
+                proc.wait(timeout=3600)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait()
+                raise
+            if proc.returncode == 0:
+                status = "done"
+                error = None
+                break
+            error = f"opencode uscito con codice {proc.returncode}"
+        except Exception as exc:  # noqa: BLE001
+            status = "error"
+            error = str(exc)
+            break  # timeout o eccezione grave: no retry
     _finish(job_id, status, error)

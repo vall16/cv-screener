@@ -48,7 +48,7 @@
 
       <div class="indeed-section">
         <h3>Scarica da Indeed</h3>
-        <p class="muted">Avvia il downloader Indeed Employer in una nuova finestra, poi sincronizza i CV scaricati.</p>
+        <p class="muted">Avvia il downloader Indeed Employer nel pannello integrato, poi sincronizza i CV scaricati.</p>
         <div class="row">
           <button class="primary" (click)="launchIndeed()">Scarica da Indeed</button>
           <button (click)="syncIndeed()" [disabled]="indeedSyncing">
@@ -358,3 +358,40 @@
 <footer class="foot">
   cv-screener · backend Python (FastAPI) + frontend Angular · esegue opencode con l'agente hr-recruiter
 </footer>
+
+<!-- ── Indeed Downloader Modal ── -->
+@if (indeedModalOpen) {
+  <div class="modal-overlay" (click)="closeIndeedModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-head">
+        <h3>Downloader Indeed</h3>
+        <div class="row" style="margin:0">
+          @if (indeedRunning) {
+            <button class="ghost danger" (click)="indeedStopProcess()">Stop</button>
+          }
+          <button class="ghost" (click)="closeIndeedModal()">Chiudi</button>
+        </div>
+      </div>
+      <div class="terminal" #indeedTerminal>
+        @for (line of indeedLines; track $index) {
+          <div class="terminal-line">{{ line }}</div>
+        }
+        @if (indeedLines.length === 0) {
+          <div class="terminal-line muted">Avvio del downloader…</div>
+        }
+      </div>
+      <div class="modal-input">
+        <input
+          type="text"
+          [(ngModel)]="indeedInputText"
+          (keydown.enter)="indeedSendInput()"
+          placeholder="Inserisci il comando e premi Invio…"
+          [disabled]="!indeedRunning"
+        />
+        <button class="primary" (click)="indeedSendInput()" [disabled]="!indeedRunning || !indeedInputText">
+          Invia
+        </button>
+      </div>
+    </div>
+  </div>
+}

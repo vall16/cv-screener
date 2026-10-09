@@ -334,20 +334,93 @@ INDEED_DIR = Path.home() / "indeedBulkResumesDownloader"
 INDEED_DOWNLOADS = INDEED_DIR / "downloads"
 INDEED_PYTHON = INDEED_DIR / ".venv" / "Scripts" / "python.exe"
 
+# Stato del downloader in-process
+import threading
+_indeed_proc: subprocess.Popen | None = None
+_indeed_lines: list[str] = []
+_indeed_lock = threading.Lock()
+
+
+def _indeed_reader(proc: subprocess.Popen) -> None:
+    """Thread daemon: legge stdout del downloader e accumula le righe."""
+    assert proc.stdout is not None
+    for line in proc.stdout:
+        with _indeed_lock:
+            _indeed_lines.append(line.rstrip("\n"))
+            if len(_indeed_lines) > 2000:
+                del _indeed_lines[:1000]
+    proc.wait()
+
 
 @app.post("/api/indeed/launch")
 def api_indeed_launch():
-    """Apri una nuova finestra terminale con il downloader Indeed."""
+    """Avvia il downloader Indeed in-process (gestito via API)."""
+    global _indeed_proc, _indeed_lines
     if not INDEED_DIR.is_dir():
         raise HTTPException(status_code=404, detail="Cartella indeedBulkResumesDownloader non trovata in " + str(Path.home()))
     script = INDEED_DIR / "indeed_downloader.py"
     if not script.is_file():
         raise HTTPException(status_code=404, detail="indeed_downloader.py non trovato")
-    python = str(INDEED_PYTHON) if INDEED_PYTHON.is_file() else "python"
-    runner = str(Path(__file__).resolve().parent / "indeed_runner.py")
-    cmd = f'start cmd /k "cd /d {INDEED_DIR} && {python} {runner} {script}"'
-    subprocess.Popen(cmd, shell=True)
-    return {"ok": True, "message": "Finestra terminale aperta. Loggati su Indeed Employer e segui il menu."}
+    with _indeed_lock:
+        if _indeed_proc is not None and _indeed_proc.poll() is None:
+            raise HTTPException(status_code=409, detail="Downloader già in esecuzione.")
+        _indeed_lines = []
+        python = str(INDEED_PYTHON) if INDEED_PYTHON.is_file() else "python"
+        runner = str(Path(__file__).resolve().parent / "indeed_runner.py")
+        env = os.environ.copy()
+        env["PYTHONIOENCODING"] = "utf-8"
+        _indeed_proc = subprocess.Popen(
+            [python, runner, str(script)],
+            cwd=str(INDEED_DIR),
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=env,
+        )
+        threading.Thread(target=_indeed_reader, args=(_indeed_proc,), daemon=True).start()
+    return {"ok": True, "message": "Downloader avviato. Segui le istruzioni nel pannello."}
+
+
+@app.get("/api/indeed/stream")
+def api_indeed_stream(offset: int = 0):
+    """Restituisce le righe di output dal dato offset + stato del processo."""
+    with _indeed_lock:
+        lines = _indeed_lines[offset:]
+        total = len(_indeed_lines)
+        running = _indeed_proc is not None and _indeed_proc.poll() is None
+    return {"lines": lines, "total": total, "running": running}
+
+
+class IndeedInput(BaseModel):
+    text: str
+
+
+@app.post("/api/indeed/input")
+def api_indeed_input(body: IndeedInput):
+    """Invia una riga di input allo stdin del downloader."""
+    with _indeed_lock:
+        if _indeed_proc is None or _indeed_proc.poll() is not None:
+            raise HTTPException(status_code=409, detail="Downloader non in esecuzione.")
+        if _indeed_proc.stdin is None:
+            raise HTTPException(status_code=500, detail="Stdin non disponibile.")
+        _indeed_proc.stdin.write(body.text + "\n")
+        _indeed_proc.stdin.flush()
+    return {"ok": True}
+
+
+@app.post("/api/indeed/stop")
+def api_indeed_stop():
+    """Termina il downloader in esecuzione."""
+    global _indeed_proc
+    with _indeed_lock:
+        if _indeed_proc is not None and _indeed_proc.poll() is None:
+            _indeed_proc.kill()
+            _indeed_proc.wait()
+            _indeed_proc = None
+    return {"ok": True}
 
 
 def _sha256(path: Path) -> str:

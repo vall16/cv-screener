@@ -75,6 +75,7 @@ export class App implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.stopPolling();
+    this.stopIndeedPolling();
   }
 
   md(src: string): string {
@@ -506,15 +507,91 @@ export class App implements OnInit, OnDestroy {
   indeedArchiveAvailable = false;
   indeedClearing = false;
 
+  // ── Indeed modal (terminale in-app) ──
+  indeedModalOpen = false;
+  indeedLines: string[] = [];
+  indeedOffset = 0;
+  indeedRunning = false;
+  indeedInputText = '';
+  private indeedPollId: ReturnType<typeof setInterval> | null = null;
+
   async launchIndeed(): Promise<void> {
     this.indeedMsg = '';
     try {
-      const r = await firstValueFrom(this.api.indeedLaunch());
-      this.indeedMsg = r.message;
+      await firstValueFrom(this.api.indeedLaunch());
+      this.openIndeedModal();
     } catch (e: unknown) {
       const err = e as { error?: { detail?: string } };
       this.indeedMsg = err?.error?.detail ?? 'Impossibile avviare il downloader Indeed.';
     }
+  }
+
+  openIndeedModal(): void {
+    this.indeedModalOpen = true;
+    this.indeedLines = [];
+    this.indeedOffset = 0;
+    this.indeedRunning = true;
+    this.indeedInputText = '';
+    this.startIndeedPolling();
+  }
+
+  closeIndeedModal(): void {
+    this.stopIndeedPolling();
+    this.indeedModalOpen = false;
+    this.indeedRunning = false;
+    // Ferma anche il processo se ancora attivo
+    void firstValueFrom(this.api.indeedStop()).catch(() => {});
+  }
+
+  private startIndeedPolling(): void {
+    this.stopIndeedPolling();
+    this.indeedPollId = setInterval(() => {
+      void this.indeedPoll();
+    }, 1500);
+  }
+
+  private stopIndeedPolling(): void {
+    if (this.indeedPollId) {
+      clearInterval(this.indeedPollId);
+      this.indeedPollId = null;
+    }
+  }
+
+  private async indeedPoll(): Promise<void> {
+    try {
+      const r = await firstValueFrom(this.api.indeedStream(this.indeedOffset));
+      if (r.lines.length) {
+        this.indeedLines.push(...r.lines);
+        this.indeedOffset = r.total;
+      }
+      this.indeedRunning = r.running;
+      if (!r.running) {
+        this.stopIndeedPolling();
+      }
+    } catch {
+      // backend non raggiungibile: ignora
+    }
+  }
+
+  async indeedSendInput(): Promise<void> {
+    const text = this.indeedInputText;
+    this.indeedInputText = '';
+    if (!text) return;
+    try {
+      await firstValueFrom(this.api.indeedInput(text));
+    } catch {
+      // processo non più attivo
+    }
+  }
+
+  async indeedStopProcess(): Promise<void> {
+    try {
+      await firstValueFrom(this.api.indeedStop());
+    } catch {
+      // ignore
+    }
+    this.indeedRunning = false;
+    this.stopIndeedPolling();
   }
 
   async syncIndeed(): Promise<void> {
