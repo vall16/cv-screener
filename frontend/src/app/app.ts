@@ -565,6 +565,7 @@ export class App implements OnInit, OnDestroy {
       if (r.lines.length) {
         this.indeedLines.push(...r.lines);
         this.indeedOffset = r.total;
+        this.scrollIndeedTerminal();
       }
       this.indeedRunning = r.running;
       if (!r.running) {
@@ -575,10 +576,20 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
+  private scrollIndeedTerminal(): void {
+    afterNextRender(() => {
+      if (this.indeedTerminal) {
+        this.indeedTerminal.nativeElement.scrollTop = this.indeedTerminal.nativeElement.scrollHeight;
+      }
+    });
+  }
+
   async indeedSendInput(): Promise<void> {
     const text = this.indeedInputText;
     this.indeedInputText = '';
     if (!text) return;
+    this.indeedLines.push(`❯ ${text}`);
+    this.scrollIndeedTerminal();
     try {
       await firstValueFrom(this.api.indeedInput(text));
     } catch {
