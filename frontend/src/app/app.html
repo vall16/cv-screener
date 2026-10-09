@@ -364,7 +364,10 @@
   <div class="modal-overlay" (click)="closeIndeedModal()">
     <div class="modal" (click)="$event.stopPropagation()">
       <div class="modal-head">
-        <h3>Downloader Indeed</h3>
+        <h3>
+          <span class="dot" [class.green]="indeedRunning" [class.red]="!indeedRunning"></span>
+          Downloader Indeed
+        </h3>
         <div class="row" style="margin:0">
           @if (indeedRunning) {
             <button class="ghost danger" (click)="indeedStopProcess()">Stop</button>
@@ -372,9 +375,12 @@
           <button class="ghost" (click)="closeIndeedModal()">Chiudi</button>
         </div>
       </div>
+      @if (!indeedRunning && indeedLines.length > 0) {
+        <div class="banner info" style="margin:10px 16px 0;border-radius:8px">Processo terminato.</div>
+      }
       <div class="terminal" #indeedTerminal>
         @for (line of indeedLines; track $index) {
-          <div class="terminal-line">{{ line }}</div>
+          <div class="terminal-line" [class.echo]="line.startsWith('❯ ')">{{ line }}</div>
         }
         @if (indeedLines.length === 0) {
           <div class="terminal-line muted">Avvio del downloader…</div>

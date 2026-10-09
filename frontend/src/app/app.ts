@@ -1,6 +1,7 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { afterNextRender, ViewChild } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { ApiService, Candidate, Job, Session, ProfileTemplate } from './api.service';
 import { renderMarkdown } from './markdown';
@@ -14,6 +15,7 @@ type Step = 'upload' | 'run' | 'results';
   styleUrl: './app.css',
 })
 export class App implements OnInit, OnDestroy {
+  @ViewChild('indeedTerminal') indeedTerminal!: { nativeElement: HTMLElement };
   step: Step = 'upload';
 
   cvs: string[] = [];
