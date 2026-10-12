@@ -55,7 +55,7 @@ def health():
 # ── CV ────────────────────────────────────────────────
 @app.get("/api/cvs")
 def api_list_cvs():
-    return {"cvs": screener.list_cvs()}
+    return {"cvs": screener.list_cvs(), "details": screener.list_cv_details()}
 
 
 @app.post("/api/cvs/upload")

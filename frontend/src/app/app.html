@@ -6,10 +6,21 @@
       <small>selezione profili con opencode</small>
     </div>
   </div>
-  <nav class="tabs">
-    <button [class.active]="step === 'upload'" (click)="go('upload')">1 · CV</button>
-    <button [class.active]="step === 'run'" (click)="go('run')">2 · Screening</button>
-    <button [class.active]="step === 'results'" (click)="go('results')">3 · Risultati</button>
+  <nav class="stepper">
+    <button class="step" [class.active]="step === 'upload'" [class.done]="stepIndex() > 0" (click)="go('upload')">
+      <span class="step-dot">{{ stepIndex() > 0 ? '✓' : '1' }}</span>
+      <span class="step-label">CV</span>
+    </button>
+    <span class="step-bar" [class.filled]="stepIndex() > 0"></span>
+    <button class="step" [class.active]="step === 'run'" [class.done]="stepIndex() > 1" (click)="go('run')">
+      <span class="step-dot">{{ stepIndex() > 1 ? '✓' : '2' }}</span>
+      <span class="step-label">Screening</span>
+    </button>
+    <span class="step-bar" [class.filled]="stepIndex() > 1"></span>
+    <button class="step" [class.active]="step === 'results'" (click)="go('results')">
+      <span class="step-dot">3</span>
+      <span class="step-label">Risultati</span>
+    </button>
   </nav>
   <button
     class="theme-toggle"
@@ -97,7 +108,10 @@
               <button class="cv-del" (click)="$event.stopPropagation(); deleteCv(c)" title="Elimina {{ c }}">✕</button>
               <span class="cv-icon">{{ cvExt(c) }}</span>
               <span class="cv-name">{{ c }}</span>
-              <span class="cv-meta">apri →</span>
+              <div class="cv-foot">
+                <span class="cv-meta">{{ cvMetaLabel(c) }}</span>
+                <span class="cv-open">apri →</span>
+              </div>
             </div>
           }
         </div>

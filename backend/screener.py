@@ -175,6 +175,24 @@ def list_cvs(cv_dir: Path | None = None) -> list[str]:
     )
 
 
+def list_cv_details(cv_dir: Path | None = None) -> list[dict]:
+    """Metadati dei CV (nome, dimensione in byte, data modifica ISO) per la UI."""
+    folder = Path(cv_dir) if cv_dir else DEFAULT_CV_DIR
+    folder.mkdir(parents=True, exist_ok=True)
+    allowed = (".pdf", ".txt")
+    details = []
+    for p in sorted(folder.iterdir()):
+        if not (p.is_file() and p.suffix.lower() in allowed):
+            continue
+        st = p.stat()
+        details.append({
+            "name": p.name,
+            "size": st.st_size,
+            "mtime": datetime.fromtimestamp(st.st_mtime, timezone.utc).isoformat(),
+        })
+    return details
+
+
 def _safe_name(name: str) -> str | None:
     """Rifiuta nomi con separatori o '..' (path traversal)."""
     if not name or name != Path(name).name:

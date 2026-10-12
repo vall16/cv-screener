@@ -2,8 +2,15 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
+export interface CvDetail {
+  name: string;
+  size: number;
+  mtime: string;
+}
+
 export interface CvList {
   cvs: string[];
+  details: CvDetail[];
 }
 
 export interface UploadResult {

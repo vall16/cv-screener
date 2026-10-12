@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { afterNextRender, ViewChild } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { ApiService, Candidate, Job, Session, ProfileTemplate } from './api.service';
+import { ApiService, Candidate, CvDetail, Job, Session, ProfileTemplate } from './api.service';
 import { renderMarkdown } from './markdown';
 
 type Step = 'upload' | 'run' | 'results';
@@ -21,6 +21,7 @@ export class App implements OnInit, OnDestroy {
   theme: 'light' | 'dark' = 'light';
 
   cvs: string[] = [];
+  cvDetails: Record<string, CvDetail> = {};
   selectedFiles: File[] = [];
   uploadErrors: string[] = [];
   uploadError = '';
@@ -98,6 +99,10 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
+  stepIndex(): number {
+    return this.step === 'upload' ? 0 : this.step === 'run' ? 1 : 2;
+  }
+
   applySavedTheme(): void {
     let saved: string | null = null;
     try {
@@ -134,16 +139,24 @@ export class App implements OnInit, OnDestroy {
   }
 
   async refreshAll(): Promise<void> {
-    try {
-      const r = await firstValueFrom(this.api.listCvs());
-      this.cvs = r.cvs;
-    } catch {
-      this.uploadError = 'Backend non raggiungibile. Avvia il backend (python backend/main.py).';
-    }
+    await this.loadCvs();
     await this.loadJobs();
     await this.loadSessions();
     await this.loadReports();
     await this.loadIndeedArchive();
+  }
+
+  async loadCvs(): Promise<void> {
+    try {
+      const r = await firstValueFrom(this.api.listCvs());
+      this.cvs = r.cvs;
+      this.cvDetails = {};
+      for (const d of r.details ?? []) {
+        this.cvDetails[d.name] = d;
+      }
+    } catch {
+      this.uploadError = 'Backend non raggiungibile. Avvia il backend (python backend/main.py).';
+    }
   }
 
   async loadIndeedArchive(): Promise<void> {
@@ -192,7 +205,7 @@ export class App implements OnInit, OnDestroy {
     try {
       const r = await firstValueFrom(this.api.upload(this.selectedFiles));
       this.uploadErrors = r.errors ?? [];
-      this.cvs = r.cvs;
+      await this.loadCvs();
       (document.getElementById('files') as HTMLInputElement | null)?.value && ((document.getElementById('files') as HTMLInputElement).value = '');
       this.selectedFiles = [];
     } catch {
@@ -206,6 +219,7 @@ export class App implements OnInit, OnDestroy {
     try {
       await firstValueFrom(this.api.deleteCv(name));
       this.cvs = this.cvs.filter((c) => c !== name);
+      delete this.cvDetails[name];
     } catch {
       this.uploadErrors = [`Impossibile eliminare ${name}`];
     }
@@ -227,11 +241,31 @@ export class App implements OnInit, OnDestroy {
     window.open(this.api.cvFileUrl(name), '_blank', 'noopener');
   }
 
+  formatSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    const kb = bytes / 1024;
+    if (kb < 1024) return `${kb.toFixed(0)} kB`;
+    return `${(kb / 1024).toFixed(1)} MB`;
+  }
+
+  formatDate(iso: string): string {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+
+  cvMetaLabel(name: string): string {
+    const d = this.cvDetails[name];
+    if (!d) return '';
+    return `${this.formatSize(d.size)} · ${this.formatDate(d.mtime)}`;
+  }
+
   async deleteAllCvs(): Promise<void> {
     if (!confirm('Eliminare tutti i CV?')) return;
     try {
       await firstValueFrom(this.api.deleteAllCvs());
       this.cvs = [];
+      this.cvDetails = {};
     } catch {
       this.uploadErrors = ['Impossibile eliminare tutti i CV'];
     }
@@ -664,7 +698,7 @@ export class App implements OnInit, OnDestroy {
     this.indeedMsg = '';
     try {
       const r = await firstValueFrom(this.api.indeedSync());
-      this.cvs = r.cvs;
+      await this.loadCvs();
       if (r.count > 0 && r.duplicates > 0) {
         this.indeedMsg = `${r.count} CV importati, ${r.duplicates} duplicati saltati.`;
       } else if (r.count > 0) {
