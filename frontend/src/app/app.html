@@ -33,10 +33,6 @@
 
 <main class="wrap">
 
-  @if (uploadError) {
-    <div class="banner error">{{ uploadError }}</div>
-  }
-
   <!-- ─── 1 · CV ─────────────────────────────────── -->
   @if (step === 'upload') {
     <section class="card">
@@ -60,10 +56,6 @@
         </div>
       }
 
-      @for (e of uploadErrors; track e) {
-        <div class="banner error">{{ e }}</div>
-      }
-
       <div class="indeed-section">
         <h3>Scarica da Indeed</h3>
         <p class="muted">Avvia il downloader Indeed Employer nel pannello integrato, poi sincronizza i CV scaricati.</p>
@@ -80,9 +72,6 @@
         </div>
         @if (indeedArchiveAvailable) {
           <p class="muted">Archivio Indeed: {{ indeedArchive }} PDF in downloads (da qui li riprende "Sincronizza CV").</p>
-        }
-        @if (indeedMsg) {
-          <div class="banner info">{{ indeedMsg }}</div>
         }
       </div>
 
@@ -305,7 +294,7 @@
           <div class="cand-filters">
             <div class="chips">
               <button class="chip" [class.active]="candFilterGiudizio === 'all'" (click)="candFilterGiudizio = 'all'">Tutti</button>
-              <button class="chip pass" [class.active]="candFilterGiudizio === 'Si passa'" (click)="candFilterGiudizio = 'Si passa'">Si passa ({{ candCounts().pass }})</button>
+              <button class="chip pass" [class.active]="candFilterGiudizio === 'Sì passa'" (click)="candFilterGiudizio = 'Sì passa'">Sì passa ({{ candCounts().pass }})</button>
               <button class="chip eval" [class.active]="candFilterGiudizio === 'Da valutare'" (click)="candFilterGiudizio = 'Da valutare'">Da valutare ({{ candCounts().eval }})</button>
               <button class="chip no" [class.active]="candFilterGiudizio === 'No'" (click)="candFilterGiudizio = 'No'">No ({{ candCounts().no }})</button>
             </div>
@@ -430,6 +419,53 @@
 <footer class="foot">
   cv-screener · backend Python (FastAPI) + frontend Angular · esegue opencode con l'agente hr-recruiter
 </footer>
+
+<!-- ── Toast ── -->
+<div class="toasts" aria-live="polite">
+  @for (t of toasts; track t.id) {
+    <div class="toast" [class]="t.type" (click)="dismissToast(t.id)" role="status">
+      <span class="toast-icon">{{ toastIcon(t.type) }}</span>
+      <span class="toast-text">{{ t.text }}</span>
+      <span class="toast-close">✕</span>
+    </div>
+  }
+</div>
+
+<!-- ── Dialogo di conferma ── -->
+@if (confirmState.open) {
+  <div class="modal-overlay" (click)="resolveConfirm(false)">
+    <div class="modal dialog" (click)="$event.stopPropagation()">
+      <h3>{{ confirmState.title }}</h3>
+      <p class="muted">{{ confirmState.message }}</p>
+      <div class="dialog-actions">
+        <button class="ghost" (click)="resolveConfirm(false)">Annulla</button>
+        <button [class]="confirmState.danger ? 'danger-solid' : 'primary'" (click)="resolveConfirm(true)">
+          {{ confirmState.confirmLabel }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ── Dialogo di input ── -->
+@if (promptState.open) {
+  <div class="modal-overlay" (click)="resolvePrompt(null)">
+    <div class="modal dialog" (click)="$event.stopPropagation()">
+      <h3>{{ promptState.title }}</h3>
+      <input
+        class="prompt-input"
+        type="text"
+        [(ngModel)]="promptState.value"
+        (keydown.enter)="resolvePrompt(promptState.value)"
+        autofocus
+      />
+      <div class="dialog-actions">
+        <button class="ghost" (click)="resolvePrompt(null)">Annulla</button>
+        <button class="primary" (click)="resolvePrompt(promptState.value)">Salva</button>
+      </div>
+    </div>
+  </div>
+}
 
 <!-- ── Indeed Downloader Modal ── -->
 @if (indeedModalOpen) {

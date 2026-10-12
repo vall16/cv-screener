@@ -260,7 +260,7 @@ def _normalize_giudizio(value: str | None) -> str | None:
         return None
     v = value.lower().strip()
     if "passa" in v:
-        return "Si passa"
+        return "Sì passa"
     if "valuta" in v:
         return "Da valutare"
     if v.startswith("no"):

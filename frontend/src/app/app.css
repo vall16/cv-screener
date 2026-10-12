@@ -1163,3 +1163,137 @@ select {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* ── Toast ── */
+.toasts {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 1200;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: min(380px, 90vw);
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--brand);
+  box-shadow: var(--shadow);
+  font-size: 14px;
+  cursor: pointer;
+  animation: toast-in 0.18s ease-out;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.toast.ok {
+  border-left-color: var(--ok);
+}
+
+.toast.err {
+  border-left-color: var(--err);
+}
+
+.toast.info {
+  border-left-color: var(--brand);
+}
+
+.toast-icon {
+  font-weight: 700;
+  flex-shrink: 0;
+  line-height: 1.4;
+}
+
+.toast.ok .toast-icon {
+  color: var(--ok);
+}
+
+.toast.err .toast-icon {
+  color: var(--err);
+}
+
+.toast.info .toast-icon {
+  color: var(--brand);
+}
+
+.toast-text {
+  flex: 1;
+  word-break: break-word;
+}
+
+.toast-close {
+  opacity: 0.45;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.toast:hover .toast-close {
+  opacity: 0.9;
+}
+
+/* ── Dialoghi ── */
+.modal.dialog {
+  width: min(440px, 92vw);
+  padding: 22px 24px;
+  gap: 14px;
+}
+
+.modal.dialog h3 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.modal.dialog p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.prompt-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 14px;
+  background: var(--card);
+  color: var(--ink);
+}
+
+.prompt-input:focus {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+  border-color: var(--brand);
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.danger-solid {
+  background: var(--err);
+  color: #fff;
+}
+
+.danger-solid:hover {
+  filter: brightness(1.08);
+}

@@ -8,6 +8,28 @@ import { renderMarkdown } from './markdown';
 
 type Step = 'upload' | 'run' | 'results';
 
+export type ToastType = 'ok' | 'err' | 'info';
+
+interface Toast {
+  id: number;
+  text: string;
+  type: ToastType;
+}
+
+interface ConfirmState {
+  open: boolean;
+  title: string;
+  message: string;
+  confirmLabel: string;
+  danger: boolean;
+}
+
+interface PromptState {
+  open: boolean;
+  title: string;
+  value: string;
+}
+
 @Component({
   selector: 'app-root',
   imports: [CommonModule, FormsModule],
@@ -20,12 +42,17 @@ export class App implements OnInit, OnDestroy {
   step: Step = 'upload';
   theme: 'light' | 'dark' = 'light';
 
+  toasts: Toast[] = [];
+  private toastSeq = 0;
+  confirmState: ConfirmState = { open: false, title: '', message: '', confirmLabel: 'Conferma', danger: true };
+  private confirmResolve: ((v: boolean) => void) | null = null;
+  promptState: PromptState = { open: false, title: '', value: '' };
+  private promptResolve: ((v: string | null) => void) | null = null;
+
   cvs: string[] = [];
   cvDetails: Record<string, CvDetail> = {};
   cvFilter = '';
   selectedFiles: File[] = [];
-  uploadErrors: string[] = [];
-  uploadError = '';
   uploading = false;
 
   profile = '';
@@ -41,7 +68,7 @@ export class App implements OnInit, OnDestroy {
 
   // Tabella candidati (risultati interattivi)
   candidates: Candidate[] = [];
-  candFilterGiudizio = 'all'; // 'all' | 'Si passa' | 'Da valutare' | 'No'
+  candFilterGiudizio = 'all'; // 'all' | 'Sì passa' | 'Da valutare' | 'No'
   candFilterStatus = 'all'; // 'all' | 'interview' | 'rejected' | 'offer' | 'none'
   candMinScore = 0;
   candSearch = '';
@@ -136,6 +163,63 @@ export class App implements OnInit, OnDestroy {
     this.applyTheme(this.theme === 'light' ? 'dark' : 'light');
   }
 
+  // ── Toast ─────────────────────────────────────────
+  showToast(text: string, type: ToastType = 'info', ms = 4000): void {
+    const id = ++this.toastSeq;
+    this.toasts = [...this.toasts, { id, text, type }];
+    if (ms > 0) {
+      setTimeout(() => this.dismissToast(id), ms);
+    }
+  }
+
+  dismissToast(id: number): void {
+    this.toasts = this.toasts.filter((t) => t.id !== id);
+  }
+
+  toastIcon(type: ToastType): string {
+    return type === 'ok' ? '✓' : type === 'err' ? '✕' : 'ℹ';
+  }
+
+  // ── Dialoghi (confirm / prompt) ───────────────────
+  askConfirm(opts: {
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    danger?: boolean;
+  }): Promise<boolean> {
+    this.confirmState = {
+      open: true,
+      title: opts.title,
+      message: opts.message,
+      confirmLabel: opts.confirmLabel ?? 'Conferma',
+      danger: opts.danger ?? true,
+    };
+    return new Promise<boolean>((resolve) => {
+      this.confirmResolve = resolve;
+    });
+  }
+
+  resolveConfirm(value: boolean): void {
+    const resolve = this.confirmResolve;
+    this.confirmResolve = null;
+    this.confirmState = { ...this.confirmState, open: false };
+    resolve?.(value);
+  }
+
+  askPrompt(title: string, value = ''): Promise<string | null> {
+    this.promptState = { open: true, title, value };
+    return new Promise<string | null>((resolve) => {
+      this.promptResolve = resolve;
+    });
+  }
+
+  resolvePrompt(value: string | null): void {
+    const resolve = this.promptResolve;
+    this.promptResolve = null;
+    this.promptState = { ...this.promptState, open: false };
+    resolve?.(value);
+  }
+
   goResults(): void {
     if (this.job?.session_id) this.activeSessionId = this.job.session_id;
     this.go('results');
@@ -158,7 +242,7 @@ export class App implements OnInit, OnDestroy {
         this.cvDetails[d.name] = d;
       }
     } catch {
-      this.uploadError = 'Backend non raggiungibile. Avvia il backend (python backend/main.py).';
+      this.showToast('Il backend non è raggiungibile. Avvia il backend (python backend/main.py).', 'err', 8000);
     }
   }
 
@@ -203,16 +287,19 @@ export class App implements OnInit, OnDestroy {
       return;
     }
     this.uploading = true;
-    this.uploadErrors = [];
-    this.uploadError = '';
     try {
       const r = await firstValueFrom(this.api.upload(this.selectedFiles));
-      this.uploadErrors = r.errors ?? [];
+      const errors = r.errors ?? [];
+      errors.forEach((e) => this.showToast(e, 'err', 6000));
+      const saved = r.saved?.length ?? 0;
+      if (saved) {
+        this.showToast(`${saved} file caricato${saved === 1 ? '' : 'i'}.`, 'ok');
+      }
       await this.loadCvs();
       (document.getElementById('files') as HTMLInputElement | null)?.value && ((document.getElementById('files') as HTMLInputElement).value = '');
       this.selectedFiles = [];
     } catch {
-      this.uploadError = 'Upload fallito. Il backend e raggiungibile? (http://127.0.0.1:8000)';
+      this.showToast('Upload fallito. Il backend è raggiungibile? (http://127.0.0.1:8000)', 'err', 6000);
     } finally {
       this.uploading = false;
     }
@@ -223,8 +310,9 @@ export class App implements OnInit, OnDestroy {
       await firstValueFrom(this.api.deleteCv(name));
       this.cvs = this.cvs.filter((c) => c !== name);
       delete this.cvDetails[name];
+      this.showToast(`${name} eliminato.`, 'ok');
     } catch {
-      this.uploadErrors = [`Impossibile eliminare ${name}`];
+      this.showToast(`Impossibile eliminare ${name}.`, 'err');
     }
   }
 
@@ -270,13 +358,21 @@ export class App implements OnInit, OnDestroy {
   }
 
   async deleteAllCvs(): Promise<void> {
-    if (!confirm('Eliminare tutti i CV?')) return;
+    const total = this.cvs.length;
+    const ok = await this.askConfirm({
+      title: 'Eliminare tutti i CV?',
+      message: `Verranno rimossi ${total} file da CVs/. L'operazione non è reversibile.`,
+      confirmLabel: 'Elimina tutti',
+      danger: true,
+    });
+    if (!ok) return;
     try {
-      await firstValueFrom(this.api.deleteAllCvs());
+      const r = await firstValueFrom(this.api.deleteAllCvs());
       this.cvs = [];
       this.cvDetails = {};
+      this.showToast(`${r.count} CV eliminati.`, 'ok');
     } catch {
-      this.uploadErrors = ['Impossibile eliminare tutti i CV'];
+      this.showToast('Impossibile eliminare tutti i CV.', 'err');
     }
   }
 
@@ -292,18 +388,17 @@ export class App implements OnInit, OnDestroy {
 
   async createNewSession(): Promise<void> {
     if (!this.newSessionName.trim()) {
-      this.uploadError = 'Inserisci il nome della posizione.';
+      this.showToast('Inserisci il nome della posizione.', 'err');
       return;
     }
     if (!this.profile.trim()) {
-      this.uploadError = 'Inserisci il profilo target.';
+      this.showToast('Inserisci il profilo target.', 'err');
       return;
     }
     if (!this.newSessionCvs.length) {
-      this.uploadError = 'Seleziona almeno un CV per la posizione.';
+      this.showToast('Seleziona almeno un CV per la posizione.', 'err');
       return;
     }
-    this.uploadError = '';
     this.creatingSession = true;
     try {
       const s = await firstValueFrom(
@@ -314,22 +409,30 @@ export class App implements OnInit, OnDestroy {
       this.profile = '';
       this.newSessionCvs = [];
       this.activeSessionId = s.id;
+      this.showToast(`Posizione "${s.name}" creata.`, 'ok');
     } catch (e: unknown) {
       const err = e as { error?: { detail?: string } };
-      this.uploadError = err?.error?.detail ?? 'Impossibile creare la posizione.';
+      this.showToast(err?.error?.detail ?? 'Impossibile creare la posizione.', 'err');
     } finally {
       this.creatingSession = false;
     }
   }
 
   async deleteSession(s: Session): Promise<void> {
-    if (!confirm(`Eliminare la posizione "${s.name}" e i suoi report?`)) return;
+    const ok = await this.askConfirm({
+      title: 'Eliminare la posizione?',
+      message: `"${s.name}" e i suoi report verranno rimossi definitivamente.`,
+      confirmLabel: 'Elimina',
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await firstValueFrom(this.api.deleteSession(s.id));
       if (this.activeSessionId === s.id) this.activeSessionId = '';
       await this.loadSessions();
+      this.showToast(`Posizione "${s.name}" eliminata.`, 'ok');
     } catch {
-      this.uploadError = 'Impossibile eliminare la posizione.';
+      this.showToast('Impossibile eliminare la posizione.', 'err');
     }
   }
 
@@ -349,20 +452,20 @@ export class App implements OnInit, OnDestroy {
 
   async startSessionScreening(s: Session): Promise<void> {
     if (!s.cvs.length) {
-      this.uploadError = 'La posizione non ha CV selezionati.';
+      this.showToast('La posizione non ha CV selezionati.', 'err');
       return;
     }
-    this.uploadError = '';
     this.job = null;
     try {
       const r = await firstValueFrom(this.api.startJob(s.profile, s.id, s.cvs));
       this.job = r.job;
       this.step = 'run';
       this.startPolling();
+      this.showToast('Screening avviato.', 'ok');
       await this.loadJobs();
     } catch (e: unknown) {
       const err = e as { error?: { detail?: string } };
-      this.uploadError = err?.error?.detail ?? 'Impossibile avviare lo screening.';
+      this.showToast(err?.error?.detail ?? 'Impossibile avviare lo screening.', 'err');
     }
   }
 
@@ -528,7 +631,7 @@ export class App implements OnInit, OnDestroy {
     let ev = 0;
     let no = 0;
     for (const c of this.candidates) {
-      if (c.giudizio === 'Si passa') pass++;
+      if (c.giudizio === 'Sì passa') pass++;
       else if (c.giudizio === 'Da valutare') ev++;
       else if (c.giudizio === 'No') no++;
     }
@@ -554,7 +657,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   giudizioClass(g: string | null): string {
-    if (g === 'Si passa') return 'pass';
+    if (g === 'Sì passa') return 'pass';
     if (g === 'Da valutare') return 'eval';
     if (g === 'No') return 'no';
     return '';
@@ -586,16 +689,22 @@ export class App implements OnInit, OnDestroy {
   }
 
   async deleteJob(j: Job): Promise<void> {
-    if (!confirm(`Eliminare lo screening "${j.profile}"?`)) return;
+    const ok = await this.askConfirm({
+      title: 'Eliminare lo screening?',
+      message: `"${j.profile}" e il suo esito verranno rimossi.`,
+      confirmLabel: 'Elimina',
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await firstValueFrom(this.api.deleteJob(j.id));
       await this.loadJobs();
+      this.showToast('Screening eliminato.', 'ok');
     } catch {
-      this.uploadError = 'Impossibile eliminare lo screening.';
+      this.showToast('Impossibile eliminare lo screening.', 'err');
     }
   }
 
-  indeedMsg = '';
   indeedSyncing = false;
   indeedArchive = 0;
   indeedArchiveAvailable = false;
@@ -610,13 +719,12 @@ export class App implements OnInit, OnDestroy {
   private indeedPollId: ReturnType<typeof setInterval> | null = null;
 
   async launchIndeed(): Promise<void> {
-    this.indeedMsg = '';
     try {
       await firstValueFrom(this.api.indeedLaunch());
       this.openIndeedModal();
     } catch (e: unknown) {
       const err = e as { error?: { detail?: string } };
-      this.indeedMsg = err?.error?.detail ?? 'Impossibile avviare il downloader Indeed.';
+      this.showToast(err?.error?.detail ?? 'Impossibile avviare il downloader Indeed.', 'err', 6000);
     }
   }
 
@@ -704,23 +812,22 @@ export class App implements OnInit, OnDestroy {
 
   async syncIndeed(): Promise<void> {
     this.indeedSyncing = true;
-    this.indeedMsg = '';
     try {
       const r = await firstValueFrom(this.api.indeedSync());
       await this.loadCvs();
       if (r.count > 0 && r.duplicates > 0) {
-        this.indeedMsg = `${r.count} CV importati, ${r.duplicates} duplicati saltati.`;
+        this.showToast(`${r.count} CV importati, ${r.duplicates} duplicati saltati.`, 'ok');
       } else if (r.count > 0) {
-        this.indeedMsg = `${r.count} CV importato/i da Indeed.`;
+        this.showToast(`${r.count} CV importati da Indeed.`, 'ok');
       } else if (r.duplicates > 0) {
-        this.indeedMsg = `Nessun nuovo CV: ${r.duplicates} duplicati saltati.`;
+        this.showToast(`Nessun nuovo CV: ${r.duplicates} duplicati saltati.`, 'info');
       } else {
-        this.indeedMsg = 'Nessun nuovo CV da Indeed.';
+        this.showToast('Nessun nuovo CV da Indeed.', 'info');
       }
       await this.loadIndeedArchive();
     } catch (e: unknown) {
       const err = e as { error?: { detail?: string } };
-      this.indeedMsg = err?.error?.detail ?? 'Sync fallita.';
+      this.showToast(err?.error?.detail ?? 'Sincronizzazione fallita.', 'err', 6000);
     } finally {
       this.indeedSyncing = false;
     }
@@ -728,34 +835,37 @@ export class App implements OnInit, OnDestroy {
 
   async clearIndeed(): Promise<void> {
     if (!this.indeedArchiveAvailable) {
-      this.indeedMsg = 'Nessun archivio Indeed trovato.';
+      this.showToast('Nessun archivio Indeed trovato.', 'info');
       return;
     }
     if (this.indeedArchive === 0) {
-      this.indeedMsg = 'Archivio Indeed già vuoto.';
+      this.showToast('Archivio Indeed già vuoto.', 'info');
       return;
     }
     const n = this.indeedArchive;
-    const ok = confirm(
-      `Eliminare definitivamente i ${n} PDF dall'archivio Indeed? ` +
-        'Non passano dal cestino, quindi non sono recuperabili.\n\n' +
-        'I CV già importati in CVs/ restano: per rimuoverli usa "Elimina tutti".'
-    );
+    const ok = await this.askConfirm({
+      title: 'Svuotare l\'archivio Indeed?',
+      message:
+        `Eliminare definitivamente i ${n} PDF dall'archivio Indeed? ` +
+        'Non passano dal cestino, quindi non sono recuperabili. ' +
+        'I CV già importati in CVs/ restano: per rimuoverli usa "Elimina tutti".',
+      confirmLabel: 'Svuota archivio',
+      danger: true,
+    });
     if (!ok) {
       return;
     }
     this.indeedClearing = true;
-    this.indeedMsg = '';
     try {
       const r = await firstValueFrom(this.api.indeedClear());
       this.indeedArchive = r.count;
-      this.indeedMsg =
-        r.deleted > 0
-          ? `${r.deleted} PDF eliminati dall'archivio Indeed.`
-          : 'Nessun file da eliminare.';
+      this.showToast(
+        r.deleted > 0 ? `${r.deleted} PDF eliminati dall'archivio Indeed.` : 'Nessun file da eliminare.',
+        r.deleted > 0 ? 'ok' : 'info'
+      );
     } catch (e: unknown) {
       const err = e as { error?: { detail?: string } };
-      this.indeedMsg = err?.error?.detail ?? 'Eliminazione archivio fallita.';
+      this.showToast(err?.error?.detail ?? 'Eliminazione archivio fallita.', 'err', 6000);
     } finally {
       this.indeedClearing = false;
     }
@@ -806,13 +916,14 @@ export class App implements OnInit, OnDestroy {
 
   async saveTemplate(): Promise<void> {
     if (!this.profile.trim()) return;
-    const name = window.prompt('Nome del template:', this.newSessionName || 'Profilo');
+    const name = await this.askPrompt('Nome del template', this.newSessionName || 'Profilo');
     if (!name?.trim()) return;
     try {
       await firstValueFrom(this.api.saveProfile(name.trim(), this.profile.trim()));
       await this.loadTemplates();
+      this.showToast(`Template "${name.trim()}" salvato.`, 'ok');
     } catch {
-      // ignore
+      this.showToast('Impossibile salvare il template.', 'err');
     }
   }
 
