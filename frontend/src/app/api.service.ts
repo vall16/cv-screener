@@ -104,6 +104,10 @@ export class ApiService {
     return `${this.base}/api/cvs/export`;
   }
 
+  cvFileUrl(name: string): string {
+    return `${this.base}/api/cvs/${encodeURIComponent(name)}/file`;
+  }
+
   deleteAllCvs(): Observable<{ deleted: string[]; count: number }> {
     return this.http.delete<{ deleted: string[]; count: number }>(`${this.base}/api/cvs/all`);
   }

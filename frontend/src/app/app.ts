@@ -179,6 +179,22 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
+  cvExt(name: string): string {
+    const i = name.lastIndexOf('.');
+    return i >= 0 ? name.slice(i + 1).toUpperCase() : 'FILE';
+  }
+
+  cvClass(name: string): string {
+    const e = this.cvExt(name);
+    if (e === 'PDF') return 'pdf';
+    if (e === 'DOCX') return 'docx';
+    return 'txt';
+  }
+
+  openCv(name: string): void {
+    window.open(this.api.cvFileUrl(name), '_blank', 'noopener');
+  }
+
   async deleteAllCvs(): Promise<void> {
     if (!confirm('Eliminare tutti i CV?')) return;
     try {

@@ -77,14 +77,18 @@
       @if (cvs.length === 0) {
         <p class="muted">Nessun CV caricato.</p>
       }
-      <ul class="cvs">
-        @for (c of cvs; track c) {
-          <li>
-            <span class="file">{{ c }}</span>
-            <button class="ghost danger" (click)="deleteCv(c)">elimina</button>
-          </li>
-        }
-      </ul>
+      @if (cvs.length > 0) {
+        <div class="cv-grid">
+          @for (c of cvs; track c) {
+            <div class="cv-card" [class]="cvClass(c)" (click)="openCv(c)" (keydown.enter)="openCv(c)" tabindex="0" role="button" [attr.title]="'Apri ' + c">
+              <button class="cv-del" (click)="$event.stopPropagation(); deleteCv(c)" title="Elimina {{ c }}">✕</button>
+              <span class="cv-icon">{{ cvExt(c) }}</span>
+              <span class="cv-name">{{ c }}</span>
+              <span class="cv-meta">apri →</span>
+            </div>
+          }
+        </div>
+      }
 
       @if (cvs.length > 0) {
         <div class="row">

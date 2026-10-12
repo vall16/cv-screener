@@ -142,6 +142,23 @@ def api_export_cvs():
     )
 
 
+@app.get("/api/cvs/{name}/file")
+def api_get_cv_file(name: str):
+    """Serve il singolo CV (per la preview nel browser)."""
+    safe = screener._safe_name(name)
+    if safe is None:
+        raise HTTPException(status_code=400, detail="Nome file non valido")
+    path = screener.DEFAULT_CV_DIR / safe
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="CV non trovato")
+    media_type = (
+        "application/pdf"
+        if path.suffix.lower() == ".pdf"
+        else "text/plain; charset=utf-8"
+    )
+    return FileResponse(path, media_type=media_type, filename=safe)
+
+
 class ShortlistReq(BaseModel):
     session_id: str
     file: str
