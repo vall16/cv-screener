@@ -4,16 +4,74 @@
    puo' applicare il view encapsulation a questi selettori. */
 
 :root {
+  /* Light */
   --bg: #f2f4f8;
+  --bg-soft: #fafbfd;
   --card: #ffffff;
+  --panel: #f8fafc;
+  --stripe: #f1f5f9;
   --ink: #1c2330;
   --muted: #6b7486;
+  --line: #e2e6ee;
+  --line-strong: #c3d3ea;
   --brand: #2c5f9e;
   --brand-2: #1d4473;
+  --brand-soft: #e4eefb;
+  --brand-faint: #eff6ff;
+  --hover: #f0f4fa;
   --ok: #1e8e5a;
   --err: #c0392b;
+  --err-soft: #fdecea;
+  --err-line: #f5c6c0;
   --warn: #b9770e;
-  --line: #e2e6ee;
+  --info-soft: #e8f4fd;
+  --info-ink: #1a5276;
+  --info-line: #aed6f1;
+  --term-bg: #0f1722;
+  --term-fg: #cfe3ff;
+  --term-muted: #64748b;
+  --shadow: 0 8px 20px rgba(20, 30, 60, 0.1);
+  --card-shadow: 0 1px 3px rgba(20, 30, 60, 0.06);
+  --overlay: rgba(15, 23, 42, 0.6);
+  --header-from: #2c5f9e;
+  --header-to: #1d4473;
+  --header-active-fg: #1d4473;
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
+  --bg: #0f1520;
+  --bg-soft: #131b29;
+  --card: #182130;
+  --panel: #101722;
+  --stripe: #1d2737;
+  --ink: #e6ecf5;
+  --muted: #8a94a6;
+  --line: #263244;
+  --line-strong: #3a4a63;
+  --brand: #7aa5e0;
+  --brand-2: #a9c7f0;
+  --brand-soft: #223152;
+  --brand-faint: #1c2938;
+  --hover: #1d2737;
+  --ok: #4cc48a;
+  --err: #e7836f;
+  --err-soft: #3a221e;
+  --err-line: #5a3129;
+  --warn: #dfa44a;
+  --info-soft: #16293b;
+  --info-ink: #8fc2e8;
+  --info-line: #33506b;
+  --term-bg: #0a0f18;
+  --term-fg: #cfe3ff;
+  --term-muted: #64748b;
+  --shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --overlay: rgba(2, 6, 14, 0.72);
+  --header-from: #16233a;
+  --header-to: #0e1727;
+  --header-active-fg: #16233a;
+  color-scheme: dark;
 }
 
 * {

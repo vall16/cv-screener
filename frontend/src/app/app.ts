@@ -18,6 +18,7 @@ export class App implements OnInit, OnDestroy {
   @ViewChild('indeedTerminal') indeedTerminal!: { nativeElement: HTMLElement };
   private injector = inject(Injector);
   step: Step = 'upload';
+  theme: 'light' | 'dark' = 'light';
 
   cvs: string[] = [];
   selectedFiles: File[] = [];
@@ -64,6 +65,7 @@ export class App implements OnInit, OnDestroy {
   constructor(protected api: ApiService) {}
 
   async ngOnInit(): Promise<void> {
+    this.applySavedTheme();
     await this.refreshAll();
     await this.loadTemplates();
     if (!this.job || this.job.status !== 'running') {
@@ -94,6 +96,36 @@ export class App implements OnInit, OnDestroy {
       void this.loadJobs();
       void this.loadSessions();
     }
+  }
+
+  applySavedTheme(): void {
+    let saved: string | null = null;
+    try {
+      saved = localStorage.getItem('theme');
+    } catch {
+      saved = null;
+    }
+    const t =
+      saved === 'light' || saved === 'dark'
+        ? saved
+        : window.matchMedia('(prefers-color-scheme: dark)').matches
+          ? 'dark'
+          : 'light';
+    this.applyTheme(t);
+  }
+
+  applyTheme(t: 'light' | 'dark'): void {
+    this.theme = t;
+    document.documentElement.dataset['theme'] = t;
+    try {
+      localStorage.setItem('theme', t);
+    } catch {
+      // storage non disponibile: il tema vale solo per questa sessione
+    }
+  }
+
+  toggleTheme(): void {
+    this.applyTheme(this.theme === 'light' ? 'dark' : 'light');
   }
 
   goResults(): void {

@@ -2,7 +2,7 @@
    Angular scarta questi selettori nei component stylesheet. */
 
 .topbar {
-  background: linear-gradient(90deg, var(--brand), var(--brand-2));
+  background: linear-gradient(90deg, var(--header-from), var(--header-to));
   color: #fff;
   padding: 14px 24px;
   display: flex;
@@ -20,7 +20,7 @@
 
 .logo {
   background: #fff;
-  color: var(--brand);
+  color: var(--header-from);
   font-weight: 800;
   border-radius: 10px;
   padding: 6px 10px;
@@ -36,6 +36,26 @@
 .tabs {
   display: flex;
   gap: 8px;
+  margin-left: auto;
+}
+
+.theme-toggle {
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 10px;
+  color: #fff;
+  font-size: 16px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.theme-toggle:hover {
+  background: rgba(255, 255, 255, 0.25);
 }
 
 .tabs button {
@@ -50,7 +70,7 @@
 
 .tabs button.active {
   background: #fff;
-  color: var(--brand-2);
+  color: var(--header-active-fg);
   border-color: #fff;
 }
 
@@ -65,7 +85,7 @@
   border: 1px solid var(--line);
   border-radius: 14px;
   padding: 20px 24px;
-  box-shadow: 0 1px 3px rgba(20, 30, 60, 0.06);
+  box-shadow: var(--card-shadow);
 }
 
 .card h2 {
@@ -87,35 +107,75 @@ h3 {
 }
 
 .banner.error {
-  background: #fdecea;
+  background: var(--err-soft);
   color: var(--err);
-  border: 1px solid #f5c6c0;
+  border: 1px solid var(--err-line);
 }
 
 .banner.info {
-  background: #e8f4fd;
-  color: #1a5276;
-  border: 1px solid #aed6f1;
+  background: var(--info-soft);
+  color: var(--info-ink);
+  border: 1px solid var(--info-line);
+}
+
+/* ── Stati vuoti ── */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  text-align: center;
+  padding: 30px 16px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  background: var(--bg-soft);
+}
+
+.empty-icon {
+  font-size: 30px;
+  line-height: 1;
+  margin-bottom: 6px;
+  opacity: 0.85;
+}
+
+.empty-title {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.empty-text {
+  color: var(--muted);
+  font-size: 13px;
+  max-width: 340px;
+}
+
+.empty.small {
+  padding: 20px 12px;
+}
+
+.empty.small .empty-icon {
+  font-size: 22px;
 }
 
 .indeed-section {
   margin: 18px 0;
   padding: 14px 16px;
-  background: #f8fafc;
+  background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 10px;
 }
 
 .dropzone {
-  border: 2px dashed #b9c2d4;
+  border: 2px dashed var(--line-strong);
   border-radius: 12px;
   margin: 12px 0;
   transition: border-color 0.15s, background 0.15s;
 }
 
 .dropzone.dragover {
-  border-color: #2563eb;
-  background: #eff6ff;
+  border-color: var(--brand);
+  background: var(--brand-faint);
 }
 
 .dropzone input {
@@ -155,6 +215,8 @@ input:not([type]) {
   font-size: 15px;
   width: 100%;
   max-width: 460px;
+  background: var(--card);
+  color: var(--ink);
 }
 
 button {
@@ -197,7 +259,7 @@ a.ghost {
 }
 
 a.ghost:hover {
-  background: #f0f4fa;
+  background: var(--hover);
 }
 
 button.ghost.danger {
@@ -253,7 +315,7 @@ ul.cvs li {
   align-items: flex-start;
   gap: 8px;
   padding: 14px;
-  background: linear-gradient(180deg, #fbfdff, #f4f7fb);
+  background: linear-gradient(180deg, var(--bg-soft), var(--stripe));
   border: 1px solid var(--line);
   border-radius: 12px;
   cursor: pointer;
@@ -262,8 +324,8 @@ ul.cvs li {
 
 .cv-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(20, 30, 60, 0.10);
-  border-color: #c3d3ea;
+  box-shadow: var(--shadow);
+  border-color: var(--line-strong);
 }
 
 .cv-card:focus {
@@ -302,7 +364,7 @@ ul.cvs li {
   font-weight: 600;
   line-height: 1.35;
   word-break: break-all;
-  color: var(--text);
+  color: var(--ink);
 }
 
 .cv-meta {
@@ -338,8 +400,8 @@ ul.cvs li {
 }
 
 .cv-del:hover {
-  background: #fdecea;
-  border-color: #f5c6c0;
+  background: var(--err-soft);
+  border-color: var(--err-line);
   color: var(--err);
 }
 
@@ -386,8 +448,8 @@ ul.cvs li {
 }
 
 .log {
-  background: #0f1722;
-  color: #cfe3ff;
+  background: var(--term-bg);
+  color: var(--term-fg);
   border-radius: 10px;
   font-family: Consolas, monospace;
   font-size: 12px;
@@ -429,11 +491,11 @@ button.report-item {
 }
 
 button.report-item:hover {
-  background: #f0f4fa;
+  background: var(--hover);
 }
 
 button.report-item.active {
-  background: #e4eefb;
+  background: var(--brand-soft);
   border-color: var(--brand);
 }
 
@@ -515,7 +577,7 @@ button.report-item.classifica span:first-child {
 }
 
 .chip:hover {
-  background: #f0f4fa;
+  background: var(--hover);
 }
 
 .chip.active {
@@ -559,7 +621,8 @@ button.report-item.classifica span:first-child {
   border: 1px solid var(--line);
   border-radius: 6px;
   font-size: 12px;
-  background: #fff;
+  background: var(--card);
+  color: var(--ink);
   cursor: pointer;
   max-width: 140px;
 }
@@ -603,12 +666,12 @@ button.report-item.classifica span:first-child {
   font-weight: 600;
   color: var(--brand);
   text-decoration: none;
-  background: #f8fafc;
+  background: var(--panel);
   transition: background 0.15s;
 }
 
 .btn-csv:hover {
-  background: #eff6ff;
+  background: var(--brand-faint);
 }
 
 .cand-table-wrap {
@@ -657,7 +720,7 @@ button.report-item.classifica span:first-child {
 }
 
 .cand-row:hover {
-  background: #f0f4fa;
+  background: var(--hover);
 }
 
 .cand-name {
@@ -706,7 +769,7 @@ button.report-item.classifica span:first-child {
 .pos-cvs {
   margin: 12px 0;
   padding: 12px;
-  background: #f8fafc;
+  background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 10px;
 }
@@ -725,11 +788,11 @@ button.report-item.classifica span:first-child {
 }
 
 .pos-cv-list li:nth-child(even) {
-  background: #f1f5f9;
+  background: var(--stripe);
 }
 
 .pos-cv-list li:hover {
-  background: #e4eefb;
+  background: var(--brand-soft);
 }
 
 .cv-check {
@@ -775,7 +838,8 @@ select {
   font-size: 15px;
   width: 100%;
   max-width: 460px;
-  background: #fff;
+  background: var(--card);
+  color: var(--ink);
 }
 
 .foot {
@@ -806,7 +870,8 @@ select {
   border: 1px solid var(--line);
   border-radius: 8px;
   font-size: 13px;
-  background: #fff;
+  background: var(--card);
+  color: var(--ink);
   max-width: 180px;
 }
 
@@ -829,19 +894,19 @@ select {
 }
 
 .md-table th {
-  background: #f1f5f9;
+  background: var(--stripe);
   font-weight: 600;
 }
 
 .md-table tr:nth-child(even) {
-  background: #f8fafc;
+  background: var(--panel);
 }
 
 /* ── Indeed Downloader Modal ── */
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.6);
+  background: var(--overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -874,8 +939,8 @@ select {
 }
 
 .terminal {
-  background: #0f1722;
-  color: #cfe3ff;
+  background: var(--term-bg);
+  color: var(--term-fg);
   font-family: Consolas, 'Courier New', monospace;
   font-size: 13px;
   padding: 14px 16px;
@@ -894,7 +959,7 @@ select {
 }
 
 .terminal-line.muted {
-  color: #64748b;
+  color: var(--term-muted);
 }
 
 .modal-input {
@@ -911,6 +976,8 @@ select {
   border-radius: 8px;
   font-size: 14px;
   font-family: Consolas, monospace;
+  background: var(--card);
+  color: var(--ink);
 }
 
 .modal-input input:focus {

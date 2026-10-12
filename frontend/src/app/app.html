@@ -11,6 +11,13 @@
     <button [class.active]="step === 'run'" (click)="go('run')">2 · Screening</button>
     <button [class.active]="step === 'results'" (click)="go('results')">3 · Risultati</button>
   </nav>
+  <button
+    class="theme-toggle"
+    (click)="toggleTheme()"
+    [attr.title]="theme === 'dark' ? 'Modalità chiara' : 'Modalità scura'"
+  >
+    {{ theme === 'dark' ? '☀️' : '🌙' }}
+  </button>
 </header>
 
 <main class="wrap">
@@ -75,7 +82,13 @@
         </div>
       }
       @if (cvs.length === 0) {
-        <p class="muted">Nessun CV caricato.</p>
+        <div class="empty">
+          <div class="empty-icon">📄</div>
+          <div class="empty-title">Nessun CV caricato</div>
+          <div class="empty-text">
+            Trascina qui i curriculum oppure scaricali da Indeed: compariranno in questa griglia.
+          </div>
+        </div>
       }
       @if (cvs.length > 0) {
         <div class="cv-grid">
@@ -213,7 +226,13 @@
           }
         </div>
       } @else {
-        <p class="muted">Nessuno screening in corso. Crea una posizione qui sopra e avvia lo screening.</p>
+        <div class="empty">
+          <div class="empty-icon">🔍</div>
+          <div class="empty-title">Nessuno screening in corso</div>
+          <div class="empty-text">
+            Crea una posizione qui sopra, seleziona i CV desiderati e avvia lo screening.
+          </div>
+        </div>
       }
 
       @if (history.length > 1) {
@@ -323,7 +342,11 @@
       <aside class="card">
         <h2>Report</h2>
         @if (reports.length === 0) {
-          <p class="muted">Nessun report ancora. Completa uno screening al passo 2.</p>
+          <div class="empty small">
+            <div class="empty-icon">📊</div>
+            <div class="empty-title">Nessun report ancora</div>
+            <div class="empty-text">Completa uno screening al passo 2 per generare i report.</div>
+          </div>
         }
         <ul class="reports">
           @for (r of reports; track r) {
@@ -351,7 +374,11 @@
         } @else if (activeHtml) {
           <article [innerHTML]="activeHtml"></article>
         } @else {
-          <p class="muted">Seleziona un report a sinistra.</p>
+          <div class="empty small">
+            <div class="empty-icon">👈</div>
+            <div class="empty-title">Nessun report selezionato</div>
+            <div class="empty-text">Scegli un report dal pannello di sinistra per visualizzarlo.</div>
+          </div>
         }
       </div>
     </section>
