@@ -88,7 +88,14 @@
 
       <h3>CV presenti ({{ cvs.length }})</h3>
       @if (cvs.length > 0) {
-        <div class="row">
+        <div class="cv-toolbar">
+          <div class="cv-search">
+            <span class="cv-search-icon">🔍</span>
+            <input [(ngModel)]="cvFilter" placeholder="Cerca per nome…" aria-label="Cerca CV" />
+            @if (cvFilter) {
+              <button class="cv-search-clear" (click)="cvFilter = ''" title="Cancella ricerca">✕</button>
+            }
+          </div>
           <button class="ghost danger" (click)="deleteAllCvs()">Elimina tutti</button>
         </div>
       }
@@ -102,25 +109,35 @@
         </div>
       }
       @if (cvs.length > 0) {
-        <div class="cv-grid">
-          @for (c of cvs; track c) {
-            <div class="cv-card" [class]="cvClass(c)" (click)="openCv(c)" (keydown.enter)="openCv(c)" tabindex="0" role="button" [attr.title]="'Apri ' + c">
-              <button class="cv-del" (click)="$event.stopPropagation(); deleteCv(c)" title="Elimina {{ c }}">✕</button>
-              <span class="cv-icon">{{ cvExt(c) }}</span>
-              <span class="cv-name">{{ c }}</span>
-              <div class="cv-foot">
-                <span class="cv-meta">{{ cvMetaLabel(c) }}</span>
-                <span class="cv-open">apri →</span>
+        @if (filteredCvs.length > 0) {
+          <div class="cv-grid">
+            @for (c of filteredCvs; track c) {
+              <div class="cv-card" [class]="cvClass(c)" (click)="openCv(c)" (keydown.enter)="openCv(c)" tabindex="0" role="button" [attr.title]="'Apri ' + c">
+                <button class="cv-del" (click)="$event.stopPropagation(); deleteCv(c)" title="Elimina {{ c }}">✕</button>
+                <span class="cv-icon">{{ cvExt(c) }}</span>
+                <span class="cv-name">{{ c }}</span>
+                <div class="cv-foot">
+                  <span class="cv-meta">{{ cvMetaLabel(c) }}</span>
+                  <span class="cv-open">apri →</span>
+                </div>
               </div>
-            </div>
-          }
-        </div>
+            }
+          </div>
+        } @else {
+          <div class="empty small">
+            <div class="empty-icon">🔍</div>
+            <div class="empty-title">Nessun CV trovato</div>
+            <div class="empty-text">Nessun file corrisponde a "{{ cvFilter }}".</div>
+          </div>
+        }
       }
 
       @if (cvs.length > 0) {
         <div class="row">
           <a class="ghost" [href]="api.exportCvsUrl()">Scarica tutti i CV (ZIP)</a>
-          <span class="muted">{{ cvs.length }} file · PDF e TXT</span>
+          <span class="muted">
+            {{ cvFilter ? filteredCvs.length + ' di ' + cvs.length : cvs.length }} file · PDF e TXT
+          </span>
         </div>
         <div class="row end">
           <button class="primary" (click)="go('run')">Continua → Profilo e screening</button>
@@ -304,6 +321,7 @@
             </label>
             <input class="cand-search" type="text" placeholder="Cerca per nome…" [(ngModel)]="candSearch" />
             <a class="btn-csv" [href]="csvUrl()" download>⬇ CSV</a>
+            <a class="btn-csv" [href]="jsonUrl()" download>⬇ JSON</a>
           </div>
         </div>
 
@@ -383,6 +401,15 @@
       </aside>
 
       <div class="card viewer">
+        @if (activeReport) {
+          <div class="viewer-toolbar">
+            <span class="viewer-name">{{ activeReport }}</span>
+            <div class="viewer-actions">
+              <a class="ghost" [href]="pdfUrl(activeReport)" target="_blank" title="Scarica il report in PDF">Scarica PDF</a>
+              <button class="ghost" (click)="printReport()" title="Stampa il report">🖨 Stampa</button>
+            </div>
+          </div>
+        }
         @if (loadingReport) {
           <p class="muted">Caricamento…</p>
         } @else if (activeHtml) {

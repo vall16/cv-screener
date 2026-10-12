@@ -1,6 +1,7 @@
 """API FastAPI del progetto cv-screener."""
 import hashlib
 import io
+import json
 import os
 import shutil
 import subprocess
@@ -307,6 +308,23 @@ def api_reports_csv(session: str | None = None):
         iter([buf.getvalue()]),
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": 'attachment; filename="classifica.csv"'},
+    )
+
+
+@app.get("/api/reports/summary/json")
+def api_reports_json(session: str | None = None):
+    """Esporta la classifica in JSON (candidati + stato shortlist)."""
+    payload = {
+        "generated": datetime.now().isoformat(timespec="seconds"),
+        "session": session,
+        "shortlist": screener.get_shortlist(session),
+        "candidates": screener.get_candidates_summary(session),
+    }
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    return StreamingResponse(
+        iter([json.dumps(payload, ensure_ascii=False, indent=2)]),
+        media_type="application/json; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="classifica-{stamp}.json"'},
     )
 
 

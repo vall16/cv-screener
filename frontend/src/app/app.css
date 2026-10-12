@@ -351,6 +351,68 @@ ul.cvs li {
 }
 
 /* ── Griglia CV presenti ── */
+.cv-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 4px 0 12px;
+}
+
+.cv-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  max-width: 420px;
+}
+
+.cv-search-icon {
+  position: absolute;
+  left: 12px;
+  font-size: 13px;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.cv-search input {
+  width: 100%;
+  padding: 9px 34px 9px 34px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.cv-search input:focus {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+  border-color: var(--brand);
+}
+
+.cv-search-clear {
+  position: absolute;
+  right: 8px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: var(--line);
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.cv-search-clear:hover {
+  background: var(--brand);
+  color: #fff;
+}
+
 .cv-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(205px, 1fr));
@@ -593,6 +655,33 @@ button.report-item.classifica span:first-child {
 .pdf-link:hover {
   background: var(--brand);
   color: #fff;
+}
+
+.viewer-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.viewer-name {
+  font-weight: 700;
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.viewer-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.viewer-actions .ghost {
+  text-decoration: none;
 }
 
 .viewer article {

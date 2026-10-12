@@ -22,6 +22,7 @@ export class App implements OnInit, OnDestroy {
 
   cvs: string[] = [];
   cvDetails: Record<string, CvDetail> = {};
+  cvFilter = '';
   selectedFiles: File[] = [];
   uploadErrors: string[] = [];
   uploadError = '';
@@ -49,9 +50,11 @@ export class App implements OnInit, OnDestroy {
   shortlist: Record<string, string> = {};
 
   csvUrl(): string {
-    const base = this.api.base;
-    const s = this.activeSessionId ? `?session=${encodeURIComponent(this.activeSessionId)}` : '';
-    return `${base}/api/reports/summary/csv${s}`;
+    return this.api.reportsSummaryCsvUrl(this.activeSessionId || undefined);
+  }
+
+  jsonUrl(): string {
+    return this.api.reportsSummaryJsonUrl(this.activeSessionId || undefined);
   }
 
   // Sessioni (posizioni)
@@ -258,6 +261,12 @@ export class App implements OnInit, OnDestroy {
     const d = this.cvDetails[name];
     if (!d) return '';
     return `${this.formatSize(d.size)} · ${this.formatDate(d.mtime)}`;
+  }
+
+  get filteredCvs(): string[] {
+    const q = this.cvFilter.trim().toLowerCase();
+    if (!q) return this.cvs;
+    return this.cvs.filter((c) => c.toLowerCase().includes(q));
   }
 
   async deleteAllCvs(): Promise<void> {
@@ -754,6 +763,10 @@ export class App implements OnInit, OnDestroy {
 
   pdfUrl(name: string): string {
     return this.api.reportPdfUrl(name, this.activeSessionId || undefined);
+  }
+
+  printReport(): void {
+    window.print();
   }
 
   isClassifica(name: string): boolean {

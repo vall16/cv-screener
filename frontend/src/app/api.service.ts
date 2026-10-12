@@ -170,6 +170,16 @@ export class ApiService {
     return `${this.base}/api/reports/${encodeURIComponent(name)}/pdf${q}`;
   }
 
+  reportsSummaryCsvUrl(session?: string): string {
+    const q = session ? `?session=${encodeURIComponent(session)}` : '';
+    return `${this.base}/api/reports/summary/csv${q}`;
+  }
+
+  reportsSummaryJsonUrl(session?: string): string {
+    const q = session ? `?session=${encodeURIComponent(session)}` : '';
+    return `${this.base}/api/reports/summary/json${q}`;
+  }
+
   indeedLaunch(): Observable<{ ok: boolean; message: string }> {
     return this.http.post<{ ok: boolean; message: string }>(`${this.base}/api/indeed/launch`, null);
   }
