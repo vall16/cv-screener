@@ -341,6 +341,74 @@ _indeed_lines: list[str] = []
 _indeed_lock = threading.Lock()
 
 
+CHROME_COPY_PROFILE = INDEED_DIR / "chrome-profile-copy"
+
+
+def _profile_copy_ok() -> bool:
+    """True se la copia del profilo Chrome e' presente e utilizzabile."""
+    return (
+        (CHROME_COPY_PROFILE / "Local State").is_file()
+        and (CHROME_COPY_PROFILE / "Default" / "Network" / "Cookies").is_file()
+    )
+
+
+def _any_chrome_running() -> bool:
+    """True se c'e' almeno un processo Chrome attivo."""
+    try:
+        out = subprocess.run(
+            ["tasklist", "/FI", "IMAGENAME eq chrome.exe", "/NH"],
+            capture_output=True,
+            text=True,
+            errors="replace",
+            timeout=5,
+        )
+        return "chrome.exe" in out.stdout
+    except Exception:
+        return False
+
+
+def _ensure_profile_copy() -> None:
+    """Crea la copia del profilo Chrome reale (stessa sessione, no ri-login).
+
+    Da Chrome 136 il flag --remote-debugging-port e' ignorato sul profilo
+    predefinito, quindi il downloader lavora su una COPIA del profilo: stessi
+    cookie/sessione (decifrabili sul PC dell'utente), nessun nuovo login.
+    La copia va fatta con Chrome chiuso: se serve e Chrome e' aperto,
+    lo segnaliamo con un errore chiaro.
+    """
+    if _profile_copy_ok():
+        return
+    user_data = Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))) / "Google" / "Chrome" / "User Data"
+    if not (user_data / "Local State").is_file():
+        raise HTTPException(status_code=500, detail="Profilo Chrome non trovato in " + str(user_data))
+    if _any_chrome_running():
+        raise HTTPException(
+            status_code=500,
+            detail="La copia del profilo Chrome non esiste ancora: chiudi Chrome "
+                   "una volta e riavvia il download. La copia viene creata automaticamente.",
+        )
+    if CHROME_COPY_PROFILE.exists():
+        shutil.rmtree(CHROME_COPY_PROFILE, ignore_errors=True)
+    CHROME_COPY_PROFILE.mkdir(parents=True, exist_ok=True)
+    exclusions = (
+        "Cache", "Code Cache", "GPUCache", "GrShaderCache",
+        "DawnGraphiteCache", "DawnWebGPUCache", "Service Worker", "CachedData",
+    )
+    cmd = [
+        "robocopy", str(user_data), str(CHROME_COPY_PROFILE), "/E",
+        "/R:1", "/W:1", "/NFL", "/NDL", "/NJH", "/NJS",
+    ]
+    for folder in exclusions:
+        cmd += ["/XD", folder]
+    print("   Copia del profilo Chrome in corso: " + str(CHROME_COPY_PROFILE))
+    subprocess.run(cmd, timeout=600)
+    if not _profile_copy_ok():
+        raise HTTPException(
+            status_code=500,
+            detail="Copia del profilo Chrome fallita. Controlla di aver chiuso Chrome e riprova.",
+        )
+
+
 def _indeed_reader(proc: subprocess.Popen) -> None:
     """Thread daemon: legge stdout del downloader e accumula le righe."""
     assert proc.stdout is not None
@@ -364,11 +432,14 @@ def api_indeed_launch():
     with _indeed_lock:
         if _indeed_proc is not None and _indeed_proc.poll() is None:
             raise HTTPException(status_code=409, detail="Downloader già in esecuzione.")
+        _ensure_profile_copy()
         _indeed_lines = []
         python = str(INDEED_PYTHON) if INDEED_PYTHON.is_file() else "python"
         runner = str(Path(__file__).resolve().parent / "indeed_runner.py")
         env = os.environ.copy()
         env["PYTHONIOENCODING"] = "utf-8"
+        env["PYTHONUNBUFFERED"] = "1"
+        env["CHROME_COPY_PROFILE"] = str(CHROME_COPY_PROFILE)
         _indeed_proc = subprocess.Popen(
             [python, runner, str(script)],
             cwd=str(INDEED_DIR),

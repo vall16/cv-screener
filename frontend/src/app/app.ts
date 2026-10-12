@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, Injector, OnDestroy, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { afterNextRender, ViewChild } from '@angular/core';
@@ -16,6 +16,7 @@ type Step = 'upload' | 'run' | 'results';
 })
 export class App implements OnInit, OnDestroy {
   @ViewChild('indeedTerminal') indeedTerminal!: { nativeElement: HTMLElement };
+  private injector = inject(Injector);
   step: Step = 'upload';
 
   cvs: string[] = [];
@@ -577,11 +578,14 @@ export class App implements OnInit, OnDestroy {
   }
 
   private scrollIndeedTerminal(): void {
-    afterNextRender(() => {
-      if (this.indeedTerminal) {
-        this.indeedTerminal.nativeElement.scrollTop = this.indeedTerminal.nativeElement.scrollHeight;
-      }
-    });
+    afterNextRender(
+      () => {
+        if (this.indeedTerminal) {
+          this.indeedTerminal.nativeElement.scrollTop = this.indeedTerminal.nativeElement.scrollHeight;
+        }
+      },
+      { injector: this.injector }
+    );
   }
 
   async indeedSendInput(): Promise<void> {

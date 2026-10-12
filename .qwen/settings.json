@@ -27,7 +27,8 @@
       "Bash(get-nettcpconnection *)",
       "Bash(get-process *)",
       "Bash(opencode *)",
-      "Bash(npm *)"
+      "Bash(npm *)",
+      "Bash(foreach-object *)"
     ]
   },
   "$version": 4
