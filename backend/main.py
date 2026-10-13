@@ -403,27 +403,16 @@ def _any_chrome_running() -> bool:
 
 
 def _ensure_profile_copy() -> None:
-    """Crea la copia del profilo Chrome reale (stessa sessione, no ri-login).
+    """Aggiorna la copia del profilo Chrome (stessa sessione, no ri-login).
 
-    Da Chrome 136 il flag --remote-debugging-port e' ignorato sul profilo
-    predefinito, quindi il downloader lavora su una COPIA del profilo: stessi
-    cookie/sessione (decifrabili sul PC dell'utente), nessun nuovo login.
-    La copia va fatta con Chrome chiuso: se serve e Chrome e' aperto,
-    lo segnaliamo con un errore chiaro.
+    Il downloader lavora su una COPIA del profilo: stessi cookie/sessione
+    (decifrabili sul PC dell'utente), nessun nuovo login.
+    La copia viene aggiornata ad ogni launch per avere cookie freschi.
+    Funziona anche con Chrome aperto (robocopy salta i file bloccati).
     """
-    if _profile_copy_ok():
-        return
     user_data = Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))) / "Google" / "Chrome" / "User Data"
     if not (user_data / "Local State").is_file():
         raise HTTPException(status_code=500, detail="Profilo Chrome non trovato in " + str(user_data))
-    if _any_chrome_running():
-        raise HTTPException(
-            status_code=500,
-            detail="La copia del profilo Chrome non esiste ancora: chiudi Chrome "
-                   "una volta e riavvia il download. La copia viene creata automaticamente.",
-        )
-    if CHROME_COPY_PROFILE.exists():
-        shutil.rmtree(CHROME_COPY_PROFILE, ignore_errors=True)
     CHROME_COPY_PROFILE.mkdir(parents=True, exist_ok=True)
     exclusions = (
         "Cache", "Code Cache", "GPUCache", "GrShaderCache",
@@ -435,12 +424,12 @@ def _ensure_profile_copy() -> None:
     ]
     for folder in exclusions:
         cmd += ["/XD", folder]
-    print("   Copia del profilo Chrome in corso: " + str(CHROME_COPY_PROFILE))
+    print("   Aggiornamento copia profilo Chrome...")
     subprocess.run(cmd, timeout=600)
     if not _profile_copy_ok():
         raise HTTPException(
             status_code=500,
-            detail="Copia del profilo Chrome fallita. Controlla di aver chiuso Chrome e riprova.",
+            detail="Copia del profilo Chrome non utilizzabile. Chiudi Chrome una volta e riprova.",
         )
 
 
@@ -457,7 +446,7 @@ def _indeed_reader(proc: subprocess.Popen) -> None:
 
 @app.post("/api/indeed/launch")
 def api_indeed_launch():
-    """Avvia il downloader Indeed in-process (gestito via API)."""
+    """Avvia il downloader Indeed: aggiorna la copia profilo e lancia il downloader."""
     global _indeed_proc, _indeed_lines
     if not INDEED_DIR.is_dir():
         raise HTTPException(status_code=404, detail="Cartella indeedBulkResumesDownloader non trovata in " + str(Path.home()))
