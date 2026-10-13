@@ -28,7 +28,15 @@
       "Bash(get-process *)",
       "Bash(opencode *)",
       "Bash(npm *)",
-      "Bash(foreach-object *)"
+      "Bash(foreach-object *)",
+      "Bash(query *)",
+      "Bash(where-object *)",
+      "Bash(} })",
+      "Bash(get-itemproperty *)",
+      "Bash(set-itemproperty *)",
+      "Bash(start-service *)",
+      "Bash(get-service *)",
+      "Bash(start-process *)"
     ]
   },
   "$version": 4
