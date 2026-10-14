@@ -14,6 +14,7 @@ interface Toast {
   id: number;
   text: string;
   type: ToastType;
+  out?: boolean;
 }
 
 interface ConfirmState {
@@ -184,7 +185,10 @@ export class App implements OnInit, OnDestroy {
   }
 
   dismissToast(id: number): void {
-    this.toasts = this.toasts.filter((t) => t.id !== id);
+    this.toasts = this.toasts.map((t) => (t.id === id ? { ...t, out: true } : t));
+    setTimeout(() => {
+      this.toasts = this.toasts.filter((t) => t.id !== id);
+    }, 250);
   }
 
   toastIcon(type: ToastType): string {
@@ -672,6 +676,11 @@ export class App implements OnInit, OnDestroy {
       counts[t.status] = (counts[t.status] ?? 0) + 1;
     }
     return counts;
+  }
+
+  trackPipelineCount(): number {
+    const pipeline = ['screened', 'interview', 'interviewed'];
+    return this.tracking.filter((t) => pipeline.includes(t.status)).length;
   }
 
   trackSessions(): { id: string; name: string }[] {

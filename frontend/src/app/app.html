@@ -7,25 +7,30 @@
     </div>
   </div>
   <nav class="stepper">
-    <button class="step" [class.active]="step === 'upload'" [class.done]="stepIndex() > 0" (click)="go('upload')">
-      <span class="step-dot">{{ stepIndex() > 0 ? '✓' : '1' }}</span>
-      <span class="step-label">CV</span>
-    </button>
-    <span class="step-bar" [class.filled]="stepIndex() > 0"></span>
-    <button class="step" [class.active]="step === 'run'" [class.done]="stepIndex() > 1" (click)="go('run')">
-      <span class="step-dot">{{ stepIndex() > 1 ? '✓' : '2' }}</span>
-      <span class="step-label">Screening</span>
-    </button>
-    <span class="step-bar" [class.filled]="stepIndex() > 1"></span>
-    <button class="step" [class.active]="step === 'results'" (click)="go('results')">
-      <span class="step-dot">3</span>
-      <span class="step-label">Risultati</span>
-    </button>
-    <span class="step-bar" [class.filled]="stepIndex() > 2"></span>
-    <button class="step" [class.active]="step === 'tracking'" (click)="go('tracking')">
-      <span class="step-dot">4</span>
-      <span class="step-label">Candidati</span>
-    </button>
+    <div class="stepper-row">
+      <button class="step" [class.active]="step === 'upload'" (click)="go('upload')">
+        <span class="step-icon">📄</span>
+        <span class="step-label">CV</span>
+      </button>
+      <span class="step-bar" [class.filled]="stepIndex() > 0"></span>
+      <button class="step" [class.active]="step === 'run'" (click)="go('run')">
+        <span class="step-icon">⚙️</span>
+        <span class="step-label">Screening</span>
+      </button>
+      <span class="step-bar" [class.filled]="stepIndex() > 1"></span>
+      <button class="step" [class.active]="step === 'results'" (click)="go('results')">
+        <span class="step-icon">📊</span>
+        <span class="step-label">Risultati</span>
+      </button>
+      <span class="step-bar" [class.filled]="stepIndex() > 2"></span>
+      <button class="step" [class.active]="step === 'tracking'" (click)="go('tracking')">
+        <span class="step-icon">👥</span>
+        <span class="step-label">Candidati</span>
+      </button>
+    </div>
+    <div class="stepper-progress">
+      <div class="stepper-progress-fill" [style.width.%]="(stepIndex() + 1) * 25"></div>
+    </div>
   </nav>
   <button
     class="theme-toggle"
@@ -424,6 +429,27 @@
 
   <!-- ─── 4 · Candidati (tracking) ─────────────────── -->
   @if (step === 'tracking') {
+    @if (tracking.length > 0) {
+      <div class="kpi-row">
+        <div class="kpi-card total">
+          <span class="kpi-value">{{ tracking.length }}</span>
+          <span class="kpi-label">Totale</span>
+        </div>
+        <div class="kpi-card pipeline">
+          <span class="kpi-value">{{ trackPipelineCount() }}</span>
+          <span class="kpi-label">In pipeline</span>
+        </div>
+        <div class="kpi-card hired">
+          <span class="kpi-value">{{ trackCounts()['hired'] || 0 }}</span>
+          <span class="kpi-label">Assunti</span>
+        </div>
+        <div class="kpi-card rejected">
+          <span class="kpi-value">{{ trackCounts()['rejected'] || 0 }}</span>
+          <span class="kpi-label">Scartati</span>
+        </div>
+      </div>
+    }
+
     <section class="card">
       <h2>Candidati — Tracking</h2>
       <p class="muted">Vista globale di tutti i candidati di tutte le posizioni. Aggiorna stato e note per seguire il pipeline.</p>
@@ -530,7 +556,7 @@
 <!-- ── Toast ── -->
 <div class="toasts" aria-live="polite">
   @for (t of toasts; track t.id) {
-    <div class="toast" [class]="t.type" (click)="dismissToast(t.id)" role="status">
+    <div class="toast" [class]="t.type" [class.out]="t.out" (click)="dismissToast(t.id)" role="status">
       <span class="toast-icon">{{ toastIcon(t.type) }}</span>
       <span class="toast-text">{{ t.text }}</span>
       <span class="toast-close">✕</span>
