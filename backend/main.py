@@ -164,6 +164,7 @@ class ShortlistReq(BaseModel):
     session_id: str
     file: str
     status: str
+    note: str = ""
 
 
 @app.get("/api/shortlist")
@@ -174,10 +175,16 @@ def api_get_shortlist(session: str | None = None):
 @app.put("/api/shortlist")
 def api_set_shortlist(req: ShortlistReq):
     try:
-        result = screener.set_shortlist_status(req.session_id, req.file, req.status)
+        result = screener.set_shortlist_status(req.session_id, req.file, req.status, req.note)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     return {"shortlist": result}
+
+
+# ── Tracking (vista globale candidati) ───────────────
+@app.get("/api/tracking")
+def api_get_tracking():
+    return {"candidates": screener.get_all_tracking()}
 
 
 class ProfileReq(BaseModel):

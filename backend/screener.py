@@ -134,31 +134,92 @@ def delete_profile(pid: str) -> bool:
     return False
 
 
-# ── Shortlist ─────────────────────────────────────────
-_VALID_STATUSES = {"", "interview", "rejected", "offer"}
+# ── Shortlist / Tracking ──────────────────────────────
+_VALID_STATUSES = {"", "screened", "interview", "interviewed", "offer", "hired", "rejected"}
 
 
-def get_shortlist(session_id: str | None = None) -> dict[str, str]:
+def _normalize_entry(val) -> dict:
+    """Converte un valore legacy (stringa) o nuovo (dict) nel formato dict."""
+    if isinstance(val, str):
+        return {"status": val, "note": "", "updated_at": ""}
+    if isinstance(val, dict):
+        return {
+            "status": val.get("status", ""),
+            "note": val.get("note", ""),
+            "updated_at": val.get("updated_at", ""),
+        }
+    return {"status": "", "note": "", "updated_at": ""}
+
+
+def get_shortlist(session_id: str | None = None) -> dict[str, dict]:
     with _lock:
         if session_id:
-            return dict(_shortlist.get(session_id, {}))
-        # merge tutte le sessioni
-        merged: dict[str, str] = {}
+            raw = _shortlist.get(session_id, {})
+            return {k: _normalize_entry(v) for k, v in raw.items()}
+        merged: dict[str, dict] = {}
         for s in _shortlist.values():
-            merged.update(s)
+            for k, v in s.items():
+                merged[k] = _normalize_entry(v)
         return merged
 
 
-def set_shortlist_status(session_id: str, filename: str, status: str) -> dict[str, str]:
+def set_shortlist_status(session_id: str, filename: str, status: str, note: str = "") -> dict[str, dict]:
     if status not in _VALID_STATUSES:
         raise ValueError(f"Stato non valido: {status}")
     with _lock:
-        if status == "":
+        if status == "" and not note:
             _shortlist.get(session_id, {}).pop(filename, None)
         else:
-            _shortlist.setdefault(session_id, {})[filename] = status
+            _shortlist.setdefault(session_id, {})[filename] = {
+                "status": status,
+                "note": note,
+                "updated_at": _now_iso(),
+            }
         _save_shortlist()
-        return dict(_shortlist.get(session_id, {}))
+        return {k: _normalize_entry(v) for k, v in _shortlist.get(session_id, {}).items()}
+
+
+def get_all_tracking() -> list[dict]:
+    """Aggrega tutti i candidati di tutte le sessioni con i loro dati di tracking."""
+    with _lock:
+        sessions = dict(_sessions)
+        shortlist = {sid: {k: _normalize_entry(v) for k, v in entries.items()} for sid, entries in _shortlist.items()}
+    out: list[dict] = []
+    for sid, session in sessions.items():
+        candidates = get_candidates_summary(sid)
+        tracking = shortlist.get(sid, {})
+        for c in candidates:
+            t = tracking.get(c["file"], {"status": "", "note": "", "updated_at": ""})
+            out.append({
+                "name": c["name"],
+                "file": c["file"],
+                "score": c["score"],
+                "giudizio": c["giudizio"],
+                "esperienza": c["esperienza"],
+                "session_id": sid,
+                "session_name": session.get("name", sid),
+                "status": t["status"],
+                "note": t["note"],
+                "updated_at": t["updated_at"],
+            })
+    # Candidati legacy (senza sessione)
+    legacy_candidates = get_candidates_summary(None)
+    legacy_tracking = shortlist.get("", {"": {"status": "", "note": "", "updated_at": ""}})
+    for c in legacy_candidates:
+        t = legacy_tracking.get(c["file"], {"status": "", "note": "", "updated_at": ""})
+        out.append({
+            "name": c["name"],
+            "file": c["file"],
+            "score": c["score"],
+            "giudizio": c["giudizio"],
+            "esperienza": c["esperienza"],
+            "session_id": "",
+            "session_name": "—",
+            "status": t["status"],
+            "note": t["note"],
+            "updated_at": t["updated_at"],
+        })
+    return out
 
 
 def _now_iso() -> str:

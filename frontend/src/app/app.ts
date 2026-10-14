@@ -3,10 +3,10 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { afterNextRender, ViewChild } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { ApiService, Candidate, CvDetail, Job, Session, ProfileTemplate } from './api.service';
+import { ApiService, Candidate, CvDetail, Job, Session, ProfileTemplate, TrackingEntry, ShortlistEntry } from './api.service';
 import { renderMarkdown } from './markdown';
 
-type Step = 'upload' | 'run' | 'results';
+type Step = 'upload' | 'run' | 'results' | 'tracking';
 
 export type ToastType = 'ok' | 'err' | 'info';
 
@@ -74,7 +74,15 @@ export class App implements OnInit, OnDestroy {
   candSearch = '';
   candSortField: 'score' | 'name' = 'score';
   candSortDir: 'asc' | 'desc' = 'desc';
-  shortlist: Record<string, string> = {};
+  shortlist: Record<string, ShortlistEntry> = {};
+
+  // Tracking (vista globale)
+  tracking: TrackingEntry[] = [];
+  trackFilterStatus = 'all';
+  trackFilterSession = 'all';
+  trackSearch = '';
+  trackSortField: 'score' | 'name' | 'updated_at' = 'updated_at';
+  trackSortDir: 'asc' | 'desc' = 'desc';
 
   csvUrl(): string {
     return this.api.reportsSummaryCsvUrl(this.activeSessionId || undefined);
@@ -123,6 +131,9 @@ export class App implements OnInit, OnDestroy {
     if (step === 'results') {
       void this.loadReports();
     }
+    if (step === 'tracking') {
+      void this.loadTracking();
+    }
     if (step === 'upload' || step === 'run') {
       void this.loadJobs();
       void this.loadSessions();
@@ -130,7 +141,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   stepIndex(): number {
-    return this.step === 'upload' ? 0 : this.step === 'run' ? 1 : 2;
+    return this.step === 'upload' ? 0 : this.step === 'run' ? 1 : this.step === 'results' ? 2 : 3;
   }
 
   applySavedTheme(): void {
@@ -573,28 +584,125 @@ export class App implements OnInit, OnDestroy {
 
   async setCandidateStatus(file: string, status: string): Promise<void> {
     if (!this.activeSessionId) return;
+    const note = this.shortlist[file]?.note ?? '';
     // optimistic update
-    if (status === '') {
+    if (status === '' && !note) {
       delete this.shortlist[file];
     } else {
-      this.shortlist[file] = status;
+      this.shortlist[file] = { status, note, updated_at: new Date().toISOString() };
     }
     try {
-      const r = await firstValueFrom(this.api.setShortlistStatus(this.activeSessionId, file, status));
+      const r = await firstValueFrom(this.api.setShortlistStatus(this.activeSessionId, file, status, note));
       this.shortlist = r.shortlist;
     } catch {
-      // revert
       await this.loadShortlist();
     }
   }
 
   shortlistStatusLabel(s: string): string {
     switch (s) {
+      case 'screened': return 'Screanato';
       case 'interview': return 'Da intervistare';
-      case 'rejected': return 'Scartato';
+      case 'interviewed': return 'Intervistato';
       case 'offer': return 'Offerta';
+      case 'hired': return 'Assunto';
+      case 'rejected': return 'Scartato';
       default: return '';
     }
+  }
+
+  // ── Tracking (vista globale) ──────────────────────
+  async loadTracking(): Promise<void> {
+    try {
+      const r = await firstValueFrom(this.api.getTracking());
+      this.tracking = r.candidates;
+    } catch {
+      this.tracking = [];
+    }
+  }
+
+  async updateTrackingStatus(entry: TrackingEntry, status: string): Promise<void> {
+    const note = entry.note;
+    entry.status = status;
+    entry.updated_at = new Date().toISOString();
+    try {
+      await firstValueFrom(this.api.setShortlistStatus(entry.session_id, entry.file, status, note));
+    } catch {
+      await this.loadTracking();
+    }
+  }
+
+  async updateTrackingNote(entry: TrackingEntry, note: string): Promise<void> {
+    entry.note = note;
+    entry.updated_at = new Date().toISOString();
+    try {
+      await firstValueFrom(this.api.setShortlistStatus(entry.session_id, entry.file, entry.status, note));
+    } catch {
+      await this.loadTracking();
+    }
+  }
+
+  visibleTracking(): TrackingEntry[] {
+    let list = this.tracking;
+    if (this.trackFilterStatus !== 'all') {
+      list = list.filter((t) => t.status === this.trackFilterStatus);
+    }
+    if (this.trackFilterSession !== 'all') {
+      list = list.filter((t) => t.session_id === this.trackFilterSession);
+    }
+    const q = this.trackSearch.trim().toLowerCase();
+    if (q) {
+      list = list.filter((t) => t.name.toLowerCase().includes(q));
+    }
+    const dir = this.trackSortDir === 'asc' ? 1 : -1;
+    return [...list].sort((a, b) => {
+      if (this.trackSortField === 'score') {
+        return ((a.score ?? -1) - (b.score ?? -1)) * dir;
+      }
+      if (this.trackSortField === 'updated_at') {
+        return (a.updated_at.localeCompare(b.updated_at)) * dir;
+      }
+      return a.name.localeCompare(b.name, 'it') * dir;
+    });
+  }
+
+  trackCounts(): Record<string, number> {
+    const counts: Record<string, number> = { all: this.tracking.length };
+    for (const t of this.tracking) {
+      counts[t.status] = (counts[t.status] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  trackSessions(): { id: string; name: string }[] {
+    const seen = new Map<string, string>();
+    for (const t of this.tracking) {
+      if (t.session_id && !seen.has(t.session_id)) {
+        seen.set(t.session_id, t.session_name);
+      }
+    }
+    return [...seen.entries()].map(([id, name]) => ({ id, name }));
+  }
+
+  trackSortArrow(field: string): string {
+    if (this.trackSortField !== field) return '';
+    return this.trackSortDir === 'asc' ? ' ↑' : ' ↓';
+  }
+
+  trackToggleSort(field: 'score' | 'name' | 'updated_at'): void {
+    if (this.trackSortField === field) {
+      this.trackSortDir = this.trackSortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      this.trackSortField = field;
+      this.trackSortDir = field === 'score' ? 'desc' : 'asc';
+    }
+  }
+
+  trackFormatDate(iso: string): string {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
   }
 
   // Candidati dopo filtri + ordinamento (ricomputato a ogni change detection).
@@ -605,7 +713,7 @@ export class App implements OnInit, OnDestroy {
     }
     if (this.candFilterStatus !== 'all') {
       list = list.filter((c) => {
-        const s = this.shortlist[c.file] || '';
+        const s = this.shortlist[c.file]?.status || '';
         if (this.candFilterStatus === 'none') return !s;
         return s === this.candFilterStatus;
       });

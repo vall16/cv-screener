@@ -77,6 +77,29 @@ export interface CandidateList {
   candidates: Candidate[];
 }
 
+export interface TrackingEntry {
+  name: string;
+  file: string;
+  score: number | null;
+  giudizio: string | null;
+  esperienza: string | null;
+  session_id: string;
+  session_name: string;
+  status: string;
+  note: string;
+  updated_at: string;
+}
+
+export interface TrackingList {
+  candidates: TrackingEntry[];
+}
+
+export interface ShortlistEntry {
+  status: string;
+  note: string;
+  updated_at: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   readonly base = this.apiBase();
@@ -225,13 +248,17 @@ export class ApiService {
     return this.http.delete<{ ok: boolean }>(`${this.base}/api/profiles/${pid}`);
   }
 
-  getShortlist(session?: string): Observable<{ shortlist: Record<string, string> }> {
+  getShortlist(session?: string): Observable<{ shortlist: Record<string, ShortlistEntry> }> {
     const q = session ? `?session=${encodeURIComponent(session)}` : '';
-    return this.http.get<{ shortlist: Record<string, string> }>(`${this.base}/api/shortlist${q}`);
+    return this.http.get<{ shortlist: Record<string, ShortlistEntry> }>(`${this.base}/api/shortlist${q}`);
   }
 
-  setShortlistStatus(sessionId: string, file: string, status: string): Observable<{ shortlist: Record<string, string> }> {
-    return this.http.put<{ shortlist: Record<string, string> }>(`${this.base}/api/shortlist`, { session_id: sessionId, file, status });
+  setShortlistStatus(sessionId: string, file: string, status: string, note?: string): Observable<{ shortlist: Record<string, ShortlistEntry> }> {
+    return this.http.put<{ shortlist: Record<string, ShortlistEntry> }>(`${this.base}/api/shortlist`, { session_id: sessionId, file, status, note: note ?? '' });
+  }
+
+  getTracking(): Observable<TrackingList> {
+    return this.http.get<TrackingList>(`${this.base}/api/tracking`);
   }
 }
 

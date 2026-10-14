@@ -21,6 +21,11 @@
       <span class="step-dot">3</span>
       <span class="step-label">Risultati</span>
     </button>
+    <span class="step-bar" [class.filled]="stepIndex() > 2"></span>
+    <button class="step" [class.active]="step === 'tracking'" (click)="go('tracking')">
+      <span class="step-dot">4</span>
+      <span class="step-label">Candidati</span>
+    </button>
   </nav>
   <button
     class="theme-toggle"
@@ -338,10 +343,13 @@
                     }
                   </td>
                   <td (click)="$event.stopPropagation()">
-                    <select class="status-select" [value]="shortlist[c.file] || ''" (change)="setCandidateStatus(c.file, $any($event.target).value)">
+                    <select class="status-select" [value]="shortlist[c.file]?.status || ''" (change)="setCandidateStatus(c.file, $any($event.target).value)">
                       <option value="">—</option>
+                      <option value="screened">Screanato</option>
                       <option value="interview">Da intervistare</option>
+                      <option value="interviewed">Intervistato</option>
                       <option value="offer">Offerta</option>
+                      <option value="hired">Assunto</option>
                       <option value="rejected">Scartato</option>
                     </select>
                   </td>
@@ -411,6 +419,105 @@
           </div>
         }
       </div>
+    </section>
+  }
+
+  <!-- ─── 4 · Candidati (tracking) ─────────────────── -->
+  @if (step === 'tracking') {
+    <section class="card">
+      <h2>Candidati — Tracking</h2>
+      <p class="muted">Vista globale di tutti i candidati di tutte le posizioni. Aggiorna stato e note per seguire il pipeline.</p>
+
+      @if (tracking.length === 0) {
+        <div class="empty">
+          <div class="empty-icon">👥</div>
+          <div class="empty-title">Nessun candidato tracciato</div>
+          <div class="empty-text">Completa uno screening al passo 2: i candidati compariranno qui automaticamente.</div>
+        </div>
+      } @else {
+        <div class="cand-toolbar">
+          <div class="chips">
+            <button class="chip" [class.active]="trackFilterStatus === 'all'" (click)="trackFilterStatus = 'all'">Tutti ({{ trackCounts()['all'] }})</button>
+            <button class="chip" [class.active]="trackFilterStatus === 'screened'" (click)="trackFilterStatus = 'screened'">Screanati ({{ trackCounts()['screened'] || 0 }})</button>
+            <button class="chip interview" [class.active]="trackFilterStatus === 'interview'" (click)="trackFilterStatus = 'interview'">Da intervistare ({{ trackCounts()['interview'] || 0 }})</button>
+            <button class="chip" [class.active]="trackFilterStatus === 'interviewed'" (click)="trackFilterStatus = 'interviewed'">Intervistati ({{ trackCounts()['interviewed'] || 0 }})</button>
+            <button class="chip offer" [class.active]="trackFilterStatus === 'offer'" (click)="trackFilterStatus = 'offer'">Offerta ({{ trackCounts()['offer'] || 0 }})</button>
+            <button class="chip pass" [class.active]="trackFilterStatus === 'hired'" (click)="trackFilterStatus = 'hired'">Assunti ({{ trackCounts()['hired'] || 0 }})</button>
+            <button class="chip rejected" [class.active]="trackFilterStatus === 'rejected'" (click)="trackFilterStatus = 'rejected'">Scartati ({{ trackCounts()['rejected'] || 0 }})</button>
+          </div>
+          <div class="row">
+            @if (trackSessions().length > 1) {
+              <select class="status-select" [(ngModel)]="trackFilterSession">
+                <option value="all">Tutte le posizioni</option>
+                @for (s of trackSessions(); track s.id) {
+                  <option [value]="s.id">{{ s.name }}</option>
+                }
+              </select>
+            }
+            <input class="cand-search" type="text" placeholder="Cerca per nome…" [(ngModel)]="trackSearch" />
+            <button class="ghost" (click)="loadTracking()">↻ Aggiorna</button>
+          </div>
+        </div>
+
+        <div class="cand-table-wrap">
+          <table class="cand-table">
+            <thead>
+              <tr>
+                <th class="sortable" (click)="trackToggleSort('name')" [class.sorted]="trackSortField === 'name'">Nome{{ trackSortArrow('name') }}</th>
+                <th>Posizione</th>
+                <th class="sortable num" (click)="trackToggleSort('score')" [class.sorted]="trackSortField === 'score'">Voto{{ trackSortArrow('score') }}</th>
+                <th>Giudizio</th>
+                <th>Stato</th>
+                <th>Note</th>
+                <th class="sortable" (click)="trackToggleSort('updated_at')" [class.sorted]="trackSortField === 'updated_at'">Agg.{{ trackSortArrow('updated_at') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (t of visibleTracking(); track t.file + t.session_id) {
+                <tr class="cand-row">
+                  <td class="cand-name">{{ t.name }}</td>
+                  <td class="cand-session">{{ t.session_name }}</td>
+                  <td class="cand-score num">{{ t.score ?? '—' }}</td>
+                  <td>
+                    @if (t.giudizio) {
+                      <span class="pill" [class]="giudizioClass(t.giudizio)">{{ t.giudizio }}</span>
+                    } @else {
+                      <span class="muted">—</span>
+                    }
+                  </td>
+                  <td>
+                    <select class="status-select" [value]="t.status" (change)="updateTrackingStatus(t, $any($event.target).value)">
+                      <option value="">—</option>
+                      <option value="screened">Screanato</option>
+                      <option value="interview">Da intervistare</option>
+                      <option value="interviewed">Intervistato</option>
+                      <option value="offer">Offerta</option>
+                      <option value="hired">Assunto</option>
+                      <option value="rejected">Scartato</option>
+                    </select>
+                  </td>
+                  <td class="cand-note">
+                    <input
+                      class="note-input"
+                      type="text"
+                      [value]="t.note"
+                      placeholder="Aggiungi nota…"
+                      (blur)="updateTrackingNote(t, $any($event.target).value)"
+                      (keydown.enter)="$any($event.target).blur()"
+                    />
+                  </td>
+                  <td class="cand-date muted">{{ trackFormatDate(t.updated_at) }}</td>
+                </tr>
+              }
+              @empty {
+                <tr>
+                  <td colspan="7" class="muted cand-empty">Nessun candidato corrisponde ai filtri.</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
     </section>
   }
 
