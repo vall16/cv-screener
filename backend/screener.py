@@ -460,6 +460,44 @@ def delete_job(job_id: str) -> bool:
     return True
 
 
+def _cv_prefix(name: str) -> str:
+    """Prefisso di un nome CV: nome candidato senza il suffisso <YYYYMMDD>_<HHMMSS>.
+
+    I file Indeed sono nominati <NomeCandidato>_<YYYYMMDD>_<HHMMSS>.pdf e cambiano
+    nome a ogni download (nuovo timestamp), quindi il prefisso è la chiave stabile
+    per riconoscere lo stesso candidato.
+    """
+    m = re.match(r"^(.*)_\d{8}_\d{6}\.\w+$", name, re.IGNORECASE)
+    return (m.group(1) if m else Path(name).stem).strip().lower()
+
+
+def _resolve_cv_names(cv_names: list[str], folder: Path) -> list[str]:
+    """Risolvi i nomi CV sui file reali in `folder`.
+
+    I nomi salvati in una posizione possono non esistere piu' dopo un ri-download
+    (il timestamp nel nome cambia). Per ogni nome assente, prova l'abbinamento per
+    prefisso (nome candidato) contro i file attuali. Ritorna i nomi risolti, senza
+    duplicati, nell'ordine originale.
+    """
+    existing = {p.name for p in folder.iterdir() if p.is_file()}
+    by_prefix: dict[str, list[str]] = {}
+    for name in existing:
+        by_prefix.setdefault(_cv_prefix(name), []).append(name)
+
+    resolved: list[str] = []
+    seen: set[str] = set()
+    for name in cv_names:
+        if name in existing:
+            pick = name
+        else:
+            cands = by_prefix.get(_cv_prefix(name), [])
+            pick = sorted(cands)[0] if cands else None
+        if pick and pick not in seen:
+            resolved.append(pick)
+            seen.add(pick)
+    return resolved
+
+
 def start_job(
     profile: str,
     cv_dir: Path | None = None,
@@ -469,7 +507,7 @@ def start_job(
     folder = Path(cv_dir) if cv_dir else DEFAULT_CV_DIR
     folder.mkdir(parents=True, exist_ok=True)
     if cv_names:
-        cv_names = [n for n in cv_names if (folder / n).is_file()]
+        cv_names = _resolve_cv_names(cv_names, folder)
         if not cv_names:
             raise FileNotFoundError("Nessun CV valido nella selezione (tutti i file sono stati rimossi)")
     job_id = uuid.uuid4().hex[:12]

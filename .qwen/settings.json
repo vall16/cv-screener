@@ -36,7 +36,19 @@
       "Bash(set-itemproperty *)",
       "Bash(start-service *)",
       "Bash(get-service *)",
-      "Bash(start-process *)"
+      "Bash(start-process *)",
+      "Bash($d='c:\\users\\vallo\\cv-screener\\cvs')",
+      "Bash($files=get-childitem *)",
+      "Bash(write-output)",
+      "Bash($files)",
+      "Bash(write-output *)",
+      "Bash($c *)",
+      "Bash($p *)",
+      "Bash(' | ' *)",
+      "Bash(stop-process *)",
+      "Bash($r)",
+      "Bash(convertto-json *)",
+      "Bash('health_err: ' *)"
     ]
   },
   "$version": 4
