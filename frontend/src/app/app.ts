@@ -79,11 +79,23 @@ export class App implements OnInit, OnDestroy {
 
   // Tracking (vista globale)
   tracking: TrackingEntry[] = [];
+  trackView: 'board' | 'table' = 'board';
   trackFilterStatus = 'all';
   trackFilterSession = 'all';
   trackSearch = '';
   trackSortField: 'score' | 'name' | 'updated_at' = 'updated_at';
   trackSortDir: 'asc' | 'desc' = 'desc';
+
+  // Pipeline: fasi in ordine visivo (lo stato vuoto '' = "Nuovo").
+  trackStages: { key: string; label: string }[] = [
+    { key: '', label: 'Nuovo' },
+    { key: 'screened', label: 'Screanato' },
+    { key: 'interview', label: 'Da intervistare' },
+    { key: 'interviewed', label: 'Intervistato' },
+    { key: 'offer', label: 'Offerta' },
+    { key: 'hired', label: 'Assunto' },
+    { key: 'rejected', label: 'Scartato' },
+  ];
 
   csvUrl(): string {
     return this.api.reportsSummaryCsvUrl(this.activeSessionId || undefined);
@@ -681,6 +693,34 @@ export class App implements OnInit, OnDestroy {
   trackPipelineCount(): number {
     const pipeline = ['screened', 'interview', 'interviewed'];
     return this.tracking.filter((t) => pipeline.includes(t.status)).length;
+  }
+
+  // ── Pipeline (board a colonne) ─────────────────────
+  // Colonne del board: applica i filtri posizione + ricerca (non lo stato,
+  // che è già la colonna). Ogni fase raggruppa i candidati con quel status.
+  trackBoardColumns(): { key: string; label: string; items: TrackingEntry[] }[] {
+    const q = this.trackSearch.trim().toLowerCase();
+    const filtered = this.tracking.filter((t) => {
+      if (this.trackFilterSession !== 'all' && t.session_id !== this.trackFilterSession) return false;
+      if (q && !t.name.toLowerCase().includes(q)) return false;
+      return true;
+    });
+    return this.trackStages.map((s) => ({
+      key: s.key,
+      label: s.label,
+      items: filtered.filter((t) => (t.status || '') === s.key),
+    }));
+  }
+
+  trackStageIndex(status: string): number {
+    return this.trackStages.findIndex((s) => s.key === (status || ''));
+  }
+
+  // Sposta un candidato alla fase precedente/successiva (frecce ← →).
+  moveTrackStage(entry: TrackingEntry, dir: -1 | 1): void {
+    const next = this.trackStageIndex(entry.status) + dir;
+    if (next < 0 || next >= this.trackStages.length) return;
+    void this.updateTrackingStatus(entry, this.trackStages[next].key);
   }
 
   trackSessions(): { id: string; name: string }[] {

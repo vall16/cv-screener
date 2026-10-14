@@ -1549,3 +1549,209 @@ select {
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+
+/* ── Pipeline (board a colonne) ── */
+.view-toggle {
+  display: inline-flex;
+  gap: 4px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px;
+}
+
+.view-toggle .chip {
+  border: none;
+  background: transparent;
+  padding: 5px 14px;
+}
+
+.view-toggle .chip.active {
+  background: var(--brand);
+  color: #fff;
+}
+
+.pipeline-board {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(210px, 1fr);
+  gap: 12px;
+  overflow-x: auto;
+  padding: 14px 2px 6px;
+  align-items: start;
+}
+
+.pipeline-col {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--line-strong);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  min-height: 120px;
+}
+
+.pipeline-col-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.pipeline-col-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}
+
+.pipeline-col-count {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--line);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.pipeline-col-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+}
+
+.pipeline-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: var(--card-shadow);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.pipeline-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+  border-color: var(--line-strong);
+}
+
+.pipeline-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pipeline-card-name {
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.pipeline-score {
+  flex-shrink: 0;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: var(--brand-soft);
+  color: var(--brand-2);
+  font-weight: 800;
+  font-size: 14px;
+}
+
+.pipeline-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pipeline-session {
+  font-size: 11px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pipeline-note {
+  font-size: 12px;
+  color: var(--ink);
+  background: var(--bg-soft);
+  border-left: 3px solid var(--line-strong);
+  border-radius: 4px;
+  padding: 5px 8px;
+  word-break: break-word;
+}
+
+.pipeline-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pipeline-card-actions .status-select {
+  flex: 1;
+  max-width: none;
+}
+
+button.mini {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--brand);
+  font-size: 15px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+button.mini:hover:not(:disabled) {
+  background: var(--brand);
+  color: #fff;
+  border-color: var(--brand);
+}
+
+button.mini:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.pipeline-empty {
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+  padding: 14px 0;
+  opacity: 0.6;
+}
+
+/* Accenti colore per fase (bordo superiore + badge conteggio) */
+.pipeline-col.stage-new { border-top-color: #94a3b8; }
+.pipeline-col.stage-screened { border-top-color: #f59e0b; }
+.pipeline-col.stage-interview { border-top-color: #3b82f6; }
+.pipeline-col.stage-interviewed { border-top-color: #8b5cf6; }
+.pipeline-col.stage-offer { border-top-color: #059669; }
+.pipeline-col.stage-hired { border-top-color: #10b981; }
+.pipeline-col.stage-rejected { border-top-color: #ef4444; }

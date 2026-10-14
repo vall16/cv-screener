@@ -462,16 +462,22 @@
         </div>
       } @else {
         <div class="cand-toolbar">
-          <div class="chips">
-            <button class="chip" [class.active]="trackFilterStatus === 'all'" (click)="trackFilterStatus = 'all'">Tutti ({{ trackCounts()['all'] }})</button>
-            <button class="chip" [class.active]="trackFilterStatus === 'screened'" (click)="trackFilterStatus = 'screened'">Screanati ({{ trackCounts()['screened'] || 0 }})</button>
-            <button class="chip interview" [class.active]="trackFilterStatus === 'interview'" (click)="trackFilterStatus = 'interview'">Da intervistare ({{ trackCounts()['interview'] || 0 }})</button>
-            <button class="chip" [class.active]="trackFilterStatus === 'interviewed'" (click)="trackFilterStatus = 'interviewed'">Intervistati ({{ trackCounts()['interviewed'] || 0 }})</button>
-            <button class="chip offer" [class.active]="trackFilterStatus === 'offer'" (click)="trackFilterStatus = 'offer'">Offerta ({{ trackCounts()['offer'] || 0 }})</button>
-            <button class="chip pass" [class.active]="trackFilterStatus === 'hired'" (click)="trackFilterStatus = 'hired'">Assunti ({{ trackCounts()['hired'] || 0 }})</button>
-            <button class="chip rejected" [class.active]="trackFilterStatus === 'rejected'" (click)="trackFilterStatus = 'rejected'">Scartati ({{ trackCounts()['rejected'] || 0 }})</button>
-          </div>
+          @if (trackView === 'table') {
+            <div class="chips">
+              <button class="chip" [class.active]="trackFilterStatus === 'all'" (click)="trackFilterStatus = 'all'">Tutti ({{ trackCounts()['all'] }})</button>
+              <button class="chip" [class.active]="trackFilterStatus === 'screened'" (click)="trackFilterStatus = 'screened'">Screanati ({{ trackCounts()['screened'] || 0 }})</button>
+              <button class="chip interview" [class.active]="trackFilterStatus === 'interview'" (click)="trackFilterStatus = 'interview'">Da intervistare ({{ trackCounts()['interview'] || 0 }})</button>
+              <button class="chip" [class.active]="trackFilterStatus === 'interviewed'" (click)="trackFilterStatus = 'interviewed'">Intervistati ({{ trackCounts()['interviewed'] || 0 }})</button>
+              <button class="chip offer" [class.active]="trackFilterStatus === 'offer'" (click)="trackFilterStatus = 'offer'">Offerta ({{ trackCounts()['offer'] || 0 }})</button>
+              <button class="chip pass" [class.active]="trackFilterStatus === 'hired'" (click)="trackFilterStatus = 'hired'">Assunti ({{ trackCounts()['hired'] || 0 }})</button>
+              <button class="chip rejected" [class.active]="trackFilterStatus === 'rejected'" (click)="trackFilterStatus = 'rejected'">Scartati ({{ trackCounts()['rejected'] || 0 }})</button>
+            </div>
+          }
           <div class="row">
+            <div class="view-toggle">
+              <button class="chip" [class.active]="trackView === 'board'" (click)="trackView = 'board'">Pipeline</button>
+              <button class="chip" [class.active]="trackView === 'table'" (click)="trackView = 'table'">Tabella</button>
+            </div>
             @if (trackSessions().length > 1) {
               <select class="status-select" [(ngModel)]="trackFilterSession">
                 <option value="all">Tutte le posizioni</option>
@@ -485,6 +491,65 @@
           </div>
         </div>
 
+        @if (trackView === 'board') {
+          <div class="pipeline-board">
+            @for (col of trackBoardColumns(); track col.key) {
+              <div class="pipeline-col" [class]="'stage-' + (col.key || 'new')">
+                <div class="pipeline-col-head">
+                  <span class="pipeline-col-title">{{ col.label }}</span>
+                  <span class="pipeline-col-count">{{ col.items.length }}</span>
+                </div>
+                <div class="pipeline-col-body">
+                  @for (t of col.items; track t.file + t.session_id) {
+                    <div class="pipeline-card">
+                      <div class="pipeline-card-top">
+                        <span class="pipeline-card-name">{{ t.name }}</span>
+                        @if (t.score !== null) {
+                          <span class="pipeline-score">{{ t.score }}</span>
+                        }
+                      </div>
+                      <div class="pipeline-card-meta">
+                        @if (t.giudizio) {
+                          <span class="pill" [class]="giudizioClass(t.giudizio)">{{ t.giudizio }}</span>
+                        }
+                        <span class="pipeline-session">{{ t.session_name }}</span>
+                      </div>
+                      @if (t.note) {
+                        <div class="pipeline-note">{{ t.note }}</div>
+                      }
+                      <div class="pipeline-card-actions">
+                        <button
+                          class="mini"
+                          [disabled]="trackStageIndex(t.status) <= 0"
+                          (click)="moveTrackStage(t, -1)"
+                          title="Stato precedente"
+                        >←</button>
+                        <select
+                          class="status-select"
+                          [value]="t.status"
+                          (change)="updateTrackingStatus(t, $any($event.target).value)"
+                        >
+                          @for (s of trackStages; track s.key) {
+                            <option [value]="s.key">{{ s.label }}</option>
+                          }
+                        </select>
+                        <button
+                          class="mini"
+                          [disabled]="trackStageIndex(t.status) >= trackStages.length - 1"
+                          (click)="moveTrackStage(t, 1)"
+                          title="Stato successivo"
+                        >→</button>
+                      </div>
+                    </div>
+                  }
+                  @empty {
+                    <div class="pipeline-empty">—</div>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        } @else {
         <div class="cand-table-wrap">
           <table class="cand-table">
             <thead>
@@ -543,6 +608,7 @@
             </tbody>
           </table>
         </div>
+        }
       }
     </section>
   }
