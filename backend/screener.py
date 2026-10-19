@@ -24,6 +24,7 @@ _profiles: dict[str, dict] = {}
 _shortlist: dict[str, dict[str, str]] = {}  # {session_id: {filename: status}}
 _lock = threading.Lock()
 _MAX_OUTPUT_LINES = 500
+_procs: dict[str, subprocess.Popen] = {}  # job_id -> processo opencode in corso
 
 
 def _atomic_write(path: Path, data: str) -> None:
@@ -643,6 +644,7 @@ def _run(
                 errors="replace",
                 env=env,
             )
+            _procs[job_id] = proc
             assert proc.stdout is not None
             for line in proc.stdout:
                 _append_output(_jobs[job_id], line.rstrip("\n"))
@@ -657,8 +659,29 @@ def _run(
                 error = None
                 break
             error = f"opencode uscito con codice {proc.returncode}"
+        except subprocess.TimeoutExpired:
+            status = "error"
+            error = "Timeout: opencode non ha terminato entro 1 ora"
+            break
         except Exception as exc:  # noqa: BLE001
             status = "error"
             error = str(exc)
             break  # timeout o eccezione grave: no retry
+        finally:
+            _procs.pop(job_id, None)
     _finish(job_id, status, error)
+
+
+def cancel_job(job_id: str) -> bool:
+    """Uccide il processo opencode del job e lo marca come 'cancelled'."""
+    with _lock:
+        job = _jobs.get(job_id)
+        if job is None or job["status"] != "running":
+            return False
+    proc = _procs.get(job_id)
+    if proc is not None and proc.poll() is None:
+        proc.kill()
+        proc.wait()
+    _procs.pop(job_id, None)
+    _finish(job_id, "cancelled", "Job annullato dall'utente")
+    return True

@@ -234,6 +234,9 @@
             </span>
             <span class="muted">#{{ job.id }}</span>
             <span class="muted">{{ job.profile }}</span>
+            @if (job.status === 'running') {
+              <button class="danger" (click)="cancelJob()" style="margin-left:auto">■ Stop</button>
+            }
           </div>
 
           @if (job.error) {

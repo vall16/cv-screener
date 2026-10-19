@@ -272,6 +272,14 @@ def api_get_job(job_id: str):
     return {"job": job}
 
 
+@app.post("/api/jobs/{job_id}/cancel")
+def api_cancel_job(job_id: str):
+    ok = screener.cancel_job(job_id)
+    if not ok:
+        raise HTTPException(status_code=409, detail="Job non in esecuzione")
+    return {"ok": True}
+
+
 @app.delete("/api/jobs/{job_id}")
 def api_delete_job(job_id: str):
     ok = screener.delete_job(job_id)

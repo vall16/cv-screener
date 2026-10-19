@@ -19,7 +19,7 @@ export interface UploadResult {
   cvs: string[];
 }
 
-export type JobStatus = 'running' | 'done' | 'error';
+export type JobStatus = 'running' | 'done' | 'error' | 'cancelled' | 'interrupted';
 
 export interface Job {
   id: string;
@@ -155,6 +155,10 @@ export class ApiService {
 
   getJob(id: string): Observable<JobResult> {
     return this.http.get<JobResult>(`${this.base}/api/jobs/${id}`);
+  }
+
+  cancelJob(id: string): Observable<{ ok: boolean }> {
+    return this.http.post<{ ok: boolean }>(`${this.base}/api/jobs/${id}/cancel`, null);
   }
 
   deleteJob(id: string): Observable<{ ok: boolean }> {

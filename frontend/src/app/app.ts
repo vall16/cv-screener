@@ -833,6 +833,25 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
+  async cancelJob(): Promise<void> {
+    if (!this.job || this.job.status !== 'running') return;
+    const ok = await this.askConfirm({
+      title: 'Fermare lo screening?',
+      message: 'Il processo opencode verrà terminato. I report già scritti restano.',
+      confirmLabel: 'Ferma',
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await firstValueFrom(this.api.cancelJob(this.job.id));
+      this.stopPolling();
+      this.job = { ...this.job, status: 'cancelled', error: 'Job annullato dall\'utente' };
+      this.showToast('Screening fermato.', 'ok');
+    } catch {
+      this.showToast('Impossibile fermare lo screening.', 'err');
+    }
+  }
+
   async openJob(j: Job): Promise<void> {
     this.job = j;
     this.step = 'run';
@@ -1046,6 +1065,10 @@ export class App implements OnInit, OnDestroy {
         return 'In corso';
       case 'done':
         return 'Completato';
+      case 'cancelled':
+        return 'Fermato';
+      case 'interrupted':
+        return 'Interrotto';
       default:
         return 'Errore';
     }
