@@ -26,10 +26,20 @@ _lock = threading.Lock()
 _MAX_OUTPUT_LINES = 500
 
 
+def _atomic_write(path: Path, data: str) -> None:
+    """Scrivi in .tmp poi os.replace: se il processo muore a metà, il file originale resta intatto."""
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    try:
+        tmp.write_text(data, encoding="utf-8")
+        os.replace(str(tmp), str(path))
+    except OSError:
+        tmp.unlink(missing_ok=True)
+
+
 def _save_jobs() -> None:
     """Persiste i job su disco (chiamare dentro _lock)."""
     try:
-        _JOBS_FILE.write_text(json.dumps(_jobs, ensure_ascii=False, indent=2), encoding="utf-8")
+        _atomic_write(_JOBS_FILE, json.dumps(_jobs, ensure_ascii=False, indent=2))
     except OSError:
         pass
 
@@ -53,7 +63,7 @@ def _load_jobs() -> None:
 def _save_sessions() -> None:
     """Persiste le sessioni su disco (chiamare dentro _lock)."""
     try:
-        _SESSIONS_FILE.write_text(json.dumps(_sessions, ensure_ascii=False, indent=2), encoding="utf-8")
+        _atomic_write(_SESSIONS_FILE, json.dumps(_sessions, ensure_ascii=False, indent=2))
     except OSError:
         pass
 
@@ -72,14 +82,14 @@ def _load_sessions() -> None:
 
 def _save_profiles() -> None:
     try:
-        _PROFILES_FILE.write_text(json.dumps(_profiles, ensure_ascii=False, indent=2), encoding="utf-8")
+        _atomic_write(_PROFILES_FILE, json.dumps(_profiles, ensure_ascii=False, indent=2))
     except OSError:
         pass
 
 
 def _save_shortlist() -> None:
     try:
-        _SHORTLIST_FILE.write_text(json.dumps(_shortlist, ensure_ascii=False, indent=2), encoding="utf-8")
+        _atomic_write(_SHORTLIST_FILE, json.dumps(_shortlist, ensure_ascii=False, indent=2))
     except OSError:
         pass
 

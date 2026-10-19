@@ -2,12 +2,26 @@
 import hashlib
 import io
 import json
+import logging
 import os
 import shutil
 import subprocess
 import zipfile
 from datetime import datetime
 from pathlib import Path
+
+# ── Logging ───────────────────────────────────────────
+_LOG_FILE = Path(__file__).resolve().parent / "backend.log"
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    handlers=[
+        logging.FileHandler(_LOG_FILE, encoding="utf-8"),
+        logging.StreamHandler(),
+    ],
+)
+logger = logging.getLogger("cv-screener")
 
 import markdown
 from docx import Document as DocxDocument
@@ -431,7 +445,7 @@ def _ensure_profile_copy() -> None:
     ]
     for folder in exclusions:
         cmd += ["/XD", folder]
-    print("   Aggiornamento copia profilo Chrome...")
+    logger.info("Aggiornamento copia profilo Chrome...")
     subprocess.run(cmd, timeout=600)
     if not _profile_copy_ok():
         raise HTTPException(
@@ -639,4 +653,5 @@ if FRONTEND_DIST.is_dir():
 if __name__ == "__main__":
     import uvicorn
 
+    logger.info("Avvio backend cv-screener su 127.0.0.1:8000")
     uvicorn.run(app, host="127.0.0.1", port=8000)
