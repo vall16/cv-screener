@@ -70,7 +70,9 @@
         <h3>Scarica da Indeed</h3>
         <p class="muted">Avvia il downloader Indeed Employer nel pannello integrato, poi sincronizza i CV scaricati.</p>
         <div class="row">
-          <button class="primary" (click)="launchIndeed()">Scarica da Indeed</button>
+          <button class="primary" (click)="launchIndeed()" [disabled]="indeedStarting">
+            {{ indeedStarting ? 'Avvio in corso…' : 'Scarica da Indeed' }}
+          </button>
           <button (click)="syncIndeed()" [disabled]="indeedSyncing">
             {{ indeedSyncing ? 'Sincronizzazione…' : 'Sincronizza CV' }}
           </button>

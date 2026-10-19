@@ -894,13 +894,21 @@ export class App implements OnInit, OnDestroy {
   indeedInputText = '';
   private indeedPollId: ReturnType<typeof setInterval> | null = null;
 
+  indeedStarting = false;
+
   async launchIndeed(): Promise<void> {
+    if (this.indeedStarting) return;
+    this.indeedStarting = true;
+    this.openIndeedModal();
     try {
       await firstValueFrom(this.api.indeedLaunch());
-      this.openIndeedModal();
+      this.indeedLines = ['Downloader avviato. In attesa del menu…'];
     } catch (e: unknown) {
       const err = e as { error?: { detail?: string } };
-      this.showToast(err?.error?.detail ?? 'Impossibile avviare il downloader Indeed.', 'err', 6000);
+      this.indeedLines = ['ERRORE: ' + (err?.error?.detail ?? 'Impossibile avviare il downloader.')];
+      this.indeedRunning = false;
+    } finally {
+      this.indeedStarting = false;
     }
   }
 

@@ -49,7 +49,12 @@
       "Bash($r)",
       "Bash(convertto-json *)",
       "Bash('health_err: ' *)",
-      "Bash(powershell *)"
+      "Bash(powershell *)",
+      "Bash(reg *)",
+      "Bash(where *)",
+      "Bash(chromedriver *)",
+      "Bash(c:\\users\\vallo\\cv-screener\\backend\\.venv\\scripts\\python *)",
+      "Bash(c:\\users\\vallo\\appdata\\local\\programs\\python\\python313\\python *)"
     ]
   },
   "$version": 4
