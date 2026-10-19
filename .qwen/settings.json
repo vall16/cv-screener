@@ -48,7 +48,8 @@
       "Bash(stop-process *)",
       "Bash($r)",
       "Bash(convertto-json *)",
-      "Bash('health_err: ' *)"
+      "Bash('health_err: ' *)",
+      "Bash(powershell *)"
     ]
   },
   "$version": 4

@@ -30,8 +30,8 @@
   --term-bg: #0f1722;
   --term-fg: #cfe3ff;
   --term-muted: #64748b;
-  --shadow: 0 8px 20px rgba(20, 30, 60, 0.1);
-  --card-shadow: 0 1px 3px rgba(20, 30, 60, 0.06);
+  --shadow: 0 12px 32px rgba(20, 30, 60, 0.12), 0 2px 8px rgba(20, 30, 60, 0.06);
+  --card-shadow: 0 1px 2px rgba(20, 30, 60, 0.05), 0 2px 6px rgba(20, 30, 60, 0.04);
   --overlay: rgba(15, 23, 42, 0.6);
   --header-from: #2c5f9e;
   --header-to: #1d4473;
@@ -65,8 +65,8 @@
   --term-bg: #0a0f18;
   --term-fg: #cfe3ff;
   --term-muted: #64748b;
-  --shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
-  --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow: 0 14px 36px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3);
+  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.25);
   --overlay: rgba(2, 6, 14, 0.72);
   --header-from: #16233a;
   --header-to: #0e1727;
@@ -82,13 +82,25 @@ html,
 body {
   margin: 0;
   padding: 0;
-  background: var(--bg);
-  background-image: radial-gradient(circle, var(--line) 0.5px, transparent 0.5px);
-  background-size: 24px 24px;
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(circle at 12% -5%, var(--brand-faint), transparent 42%),
+    radial-gradient(circle, var(--line) 0.5px, transparent 0.5px);
+  background-size: 100% 100%, 26px 26px;
+  background-attachment: fixed;
   color: var(--ink);
-  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-family: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
   font-size: 15px;
-  line-height: 1.5;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Focus visibile coerente su tutta l'app (accessibilità + polish). */
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 6px;
 }
 
 @media print {
