@@ -207,8 +207,8 @@ export class ApiService {
     return `${this.base}/api/reports/summary/json${q}`;
   }
 
-  indeedLaunch(): Observable<{ ok: boolean; message: string }> {
-    return this.http.post<{ ok: boolean; message: string }>(`${this.base}/api/indeed/launch`, null);
+  indeedLaunch(): Observable<{ ok: boolean; message: string; warning?: string | null }> {
+    return this.http.post<{ ok: boolean; message: string; warning?: string | null }>(`${this.base}/api/indeed/launch`, null);
   }
 
   indeedSync(): Observable<{ copied: string[]; count: number; skipped: string[]; duplicates: number; cvs: string[] }> {

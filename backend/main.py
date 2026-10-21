@@ -416,6 +416,7 @@ _indeed_lock = threading.Lock()
 
 
 CHROME_COPY_PROFILE = INDEED_DIR / "chrome-profile-copy"
+INDEED_COOKIES = INDEED_DIR / "logs" / "indeed_cookies.json"
 
 
 def _profile_copy_ok() -> bool:
@@ -424,6 +425,18 @@ def _profile_copy_ok() -> bool:
         (CHROME_COPY_PROFILE / "Local State").is_file()
         and (CHROME_COPY_PROFILE / "Default" / "Network" / "Cookies").is_file()
     )
+
+
+def _is_admin() -> bool:
+    """True se il processo gira con privilegi elevati."""
+    if not _IS_WINDOWS:
+        return False
+    try:
+        import ctypes
+
+        return bool(ctypes.windll.shell32.IsUserAnAdmin())
+    except Exception:
+        return False
 
 
 def _any_chrome_running() -> bool:
@@ -450,31 +463,98 @@ def _any_chrome_running() -> bool:
         return False
 
 
-def _ensure_profile_copy() -> None:
+def _kill_profile_chrome() -> None:
+    """Chiude eventuali Chrome rimasti aperti sul profilo copiato.
+
+    Chrome non apre un'istanza nuova se il profilo e' gia' in uso: senza
+    questo, il downloader si aggancia a un Chrome vecchio (e senza porta
+    DevTools) invece di avviarne uno pulito.
+    """
+    if not _IS_WINDOWS:
+        return
+    script = (
+        "Get-CimInstance Win32_Process -Filter \"Name='chrome.exe'\" | "
+        "Where-Object { $_.CommandLine -like '*chrome-profile*' } | "
+        "ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
+    )
+    try:
+        subprocess.run(
+            ["powershell", "-NoProfile", "-Command", script],
+            capture_output=True, timeout=60,
+        )
+    except (OSError, subprocess.SubprocessError):
+        pass
+
+
+def _chrome_running() -> bool:
+    """True se l'utente ha un Chrome aperto (quello personale, non la copia)."""
+    if not _IS_WINDOWS:
+        return False
+    script = (
+        "Get-CimInstance Win32_Process -Filter \"Name='chrome.exe'\" | "
+        "Where-Object { $_.CommandLine -notlike '*chrome-profile*' } | "
+        "Select-Object -First 1 -ExpandProperty ProcessId"
+    )
+    try:
+        out = subprocess.run(
+            ["powershell", "-NoProfile", "-Command", script],
+            capture_output=True, text=True, timeout=30,
+        ).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return bool(out)
+
+
+def _ensure_profile_copy() -> str | None:
     """Aggiorna la copia del profilo Chrome (stessa sessione, no ri-login).
 
     Il downloader lavora su una COPIA del profilo: stessi cookie/sessione
     (decifrabili sul PC dell'utente), nessun nuovo login.
     La copia viene aggiornata ad ogni launch per avere cookie freschi.
-    Funziona anche con Chrome aperto (robocopy salta i file bloccati).
+
+    Chrome tiene bloccati i file del profilo mentre e' aperto: senza
+    privilegi elevati alcuni file (Cookies in primis) non si possono copiare.
+    In quel caso robocopy lascia intatti i file gia' presenti, quindi la copia
+    precedente (con la sessione) resta valida: si avvisa e si va avanti.
+
+    Restituisce un avviso (None se tutto bene).
     """
     exclusions = (
         "Cache", "Code Cache", "GPUCache", "GrShaderCache",
         "DawnGraphiteCache", "DawnWebGPUCache", "Service Worker", "CachedData",
     )
+    warning = None
     if _IS_WINDOWS:
         user_data = Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))) / "Google" / "Chrome" / "User Data"
         if not (user_data / "Local State").is_file():
             raise HTTPException(status_code=500, detail="Profilo Chrome non trovato in " + str(user_data))
         CHROME_COPY_PROFILE.mkdir(parents=True, exist_ok=True)
-        cmd = [
-            "robocopy", str(user_data), str(CHROME_COPY_PROFILE), "/E",
-            "/R:1", "/W:1", "/NFL", "/NDL", "/NJH", "/NJS",
-        ]
+        if _chrome_running():
+            # Chrome aperto: i file del profilo sono bloccati e una copia
+            # parziale rovinerebbe la sessione gia' presente (cookie
+            # Cloudflare inclusi). Si resta sulla copia gia' valida.
+            logger.info("Chrome aperto: salto la sincronizzazione del profilo")
+            return (
+                "Chrome aperto: uso la copia profilo gia' sincronizzata. "
+                "Chiudi Chrome per aggiornare la sessione."
+            )
+        cmd = ["robocopy", str(user_data), str(CHROME_COPY_PROFILE), "/E"]
+        if _is_admin():
+            # /B (backup mode): copia anche i file bloccati da Chrome (es. Cookies).
+            # Serve il privilege SeBackupPrivilege, quindi solo da admin.
+            cmd.append("/B")
+        cmd += ["/R:1", "/W:1", "/NFL", "/NDL", "/NJH", "/NJS"]
         for folder in exclusions:
             cmd += ["/XD", folder]
         logger.info("Aggiornamento copia profilo Chrome...")
-        subprocess.run(cmd, timeout=600)
+        proc = subprocess.run(cmd, timeout=600, capture_output=True, text=True, errors="replace")
+        # robocopy: 0-7 tutto copiato, >=8 alcuni file non copiati (bloccati).
+        if proc.returncode >= 8:
+            logger.warning("Copia profilo Chrome: %s file non copiati (Chrome aperto?)", proc.returncode)
+            warning = (
+                "Chrome aperto: alcuni file del profilo non sono stati copiati. "
+                "Uso la copia precedente; chiudi Chrome per sincronizzarla."
+            )
     else:
         candidates = (
             Path.home() / ".config" / "google-chrome",
@@ -495,10 +575,16 @@ def _ensure_profile_copy() -> None:
             ignore=lambda names: {n for n in names if n in exclusions},
         )
     if not _profile_copy_ok():
+        if INDEED_COOKIES.is_file():
+            return (
+                "Copia del profilo Chrome non utilizzabile (nessun Cookies). "
+                "Procedo con i cookie salvati: loggati su Indeed nella finestra se richiesto."
+            )
         raise HTTPException(
             status_code=500,
             detail="Copia del profilo Chrome non utilizzabile. Chiudi Chrome una volta e riprova.",
         )
+    return warning
 
 
 def _indeed_reader(proc: subprocess.Popen) -> None:
@@ -510,6 +596,38 @@ def _indeed_reader(proc: subprocess.Popen) -> None:
             if len(_indeed_lines) > 2000:
                 del _indeed_lines[:1000]
     proc.wait()
+
+
+def _indeed_python() -> str:
+    """Interprete Python con le dipendenze del downloader installate.
+
+    Non basta il primo python della PATH: puo' essere quello del venv del
+    backend (che ha fastapi ma non selenium). Si verifica di volta in volta
+    che i moduli servano davvero.
+    """
+    candidates = []
+    if INDEED_PYTHON.is_file():
+        candidates.append(str(INDEED_PYTHON))
+    candidates += ["python", "python3"]
+    for cand in candidates:
+        try:
+            proc = subprocess.run(
+                [cand, "-c", "import selenium, tqdm, dotenv, chromedriver_autoinstaller"],
+                capture_output=True, timeout=30,
+            )
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if proc.returncode == 0:
+            logger.info("Downloader Indeed: interprete %s", cand)
+            return cand
+    raise HTTPException(
+        status_code=500,
+        detail=(
+            "Nessun interprete Python con le dipendenze del downloader "
+            "(selenium, tqdm, python-dotenv, chromedriver-autoinstaller). "
+            "Installale con: pip install -r indeed-downloader/requirements.txt"
+        ),
+    )
 
 
 @app.post("/api/indeed/launch")
@@ -524,14 +642,18 @@ def api_indeed_launch():
     with _indeed_lock:
         if _indeed_proc is not None and _indeed_proc.poll() is None:
             raise HTTPException(status_code=409, detail="Downloader già in esecuzione.")
-        _ensure_profile_copy()
+        warning = _ensure_profile_copy()
         _indeed_lines = []
-        python = str(INDEED_PYTHON) if INDEED_PYTHON.is_file() else "python"
+        _kill_profile_chrome()
+        python = _indeed_python()
         runner = str(Path(__file__).resolve().parent / "indeed_runner.py")
         env = os.environ.copy()
         env["PYTHONIOENCODING"] = "utf-8"
         env["PYTHONUNBUFFERED"] = "1"
-        env["CHROME_COPY_PROFILE"] = str(CHROME_COPY_PROFILE)
+        if _profile_copy_ok():
+            env["CHROME_COPY_PROFILE"] = str(CHROME_COPY_PROFILE)
+        else:
+            env.pop("CHROME_COPY_PROFILE", None)
         _indeed_proc = subprocess.Popen(
             [python, runner, str(script)],
             cwd=str(INDEED_DIR),
@@ -544,7 +666,10 @@ def api_indeed_launch():
             env=env,
         )
         threading.Thread(target=_indeed_reader, args=(_indeed_proc,), daemon=True).start()
-    return {"ok": True, "message": "Downloader avviato. Segui le istruzioni nel pannello."}
+    message = "Downloader avviato. Segui le istruzioni nel pannello."
+    if warning:
+        message = warning + " " + message
+    return {"ok": True, "message": message, "warning": warning}
 
 
 @app.get("/api/indeed/stream")

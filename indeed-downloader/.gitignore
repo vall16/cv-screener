@@ -47,6 +47,10 @@ downloads/*.doc
 downloads/*.docx
 logs/*.log
 logs/*.json
+# Stato runtime: cronologia traffico e report generati
+traffic-history/
+*.report.txt
+rapport_telechargement.txt
 
 # Spec files
 *.spec

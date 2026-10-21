@@ -22,12 +22,23 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+from selenium.common.exceptions import (TimeoutException, NoSuchElementException,
+                                        StaleElementReferenceException, WebDriverException)
 import chromedriver_autoinstaller
 from tqdm import tqdm
 
 # Load environment variables
 load_dotenv('.env.config')
+
+JOBS_URL = "https://employers.indeed.com/jobs"
+
+# URL canonico della lista offerte: con la virgola non encodata
+# (status=open,paused) la SPA di Indeed resta appesa sullo scheletro.
+JOBS_CANONICAL = (
+    "https://employers.indeed.com/jobs?status=open%2Cpaused"
+    "&claimed=false&createdOnIndeed=true&tab=0"
+    "&sortDirection=DESC&sortField=datePostedOnIndeed"
+)
 
 
 class IndeedDownloader:
@@ -50,6 +61,8 @@ class IndeedDownloader:
         self.api_key = None
         self.ctk = None
         self.cookies = {}
+        self._chrome_proc = None
+        self._debugger_port = None
 
         # Current job info
         self.current_job_id = None
@@ -207,11 +220,125 @@ class IndeedDownloader:
         print("=" * 60)
         print()
 
+    def _chrome_binary(self) -> str:
+        """Percorso dell'eseguibile di Chrome, se installato."""
+        candidates = [
+            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+            r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        ]
+        for path in candidates:
+            if Path(path).is_file():
+                return path
+        return ""
+
+    def _attach_to_real_chrome(self) -> int | None:
+        """Lancia un Chrome vero e restituisce la porta DevTools.
+
+        Necessario per Indeed: la pagina /jobs e' protetta da Cloudflare, che
+        butta fuori le istanze lanciate da chromedriver (flag di automazione,
+        navigator.webdriver). Un Chrome normale aperto con lo stesso profilo
+        passa la verifica, quindi si lancia Chrome a mano e ci si collega.
+
+        Ritorna la porta DevTools, o None se non si e' potuto avviare.
+        """
+        import socket
+        import subprocess
+        import urllib.request
+
+        chrome_bin = self._chrome_binary()
+        if not chrome_bin:
+            return None
+
+        with socket.socket() as sock:
+            sock.bind(('127.0.0.1', 0))
+            port = sock.getsockname()[1]
+
+        args = [
+            chrome_bin,
+            f"--remote-debugging-port={port}",
+            "--no-first-run",
+            "--no-default-browser-check",
+            "--disable-features=Translate,MediaRouter",
+            "--password-store=basic",
+            "--window-size=1400,900",
+        ]
+        profile_copy = os.getenv('CHROME_COPY_PROFILE', '')
+        if profile_copy and Path(profile_copy).is_dir():
+            args.append(f"--user-data-dir={profile_copy}")
+        # about:blank: la navigazione verso Indeed la fa poi Selenium, che
+        # e' l'unico modo in cui la SPA si carica correttamente.
+        args.append("about:blank")
+
+        log_path = Path(self.log_folder) / 'chrome_debug.log'
+        try:
+            log_file = open(log_path, 'a', encoding='utf-8')
+            self._chrome_proc = subprocess.Popen(args, stdout=log_file, stderr=log_file)
+        except Exception as e:
+            print(f"   ⚠️  Impossibile lanciare Chrome: {e}" if self.language == 'en'
+                  else f"   ⚠️  Impossible de lancer Chrome: {e}")
+            return None
+
+        # Aspetta che l'endpoint DevTools risponda
+        for _ in range(60):
+            time.sleep(0.5)
+            try:
+                with urllib.request.urlopen(f"http://127.0.0.1:{port}/json/version", timeout=2) as resp:
+                    if resp.status == 200:
+                        return port
+            except Exception:
+                continue
+        print("   ⚠️  DevTools non raggiungibile, uso chromedriver" if self.language == 'en'
+              else "   ⚠️  DevTools injoignable, utilisation de chromedriver")
+        return None
+
+    def _kill_chrome(self):
+        """Chiude il Chrome lanciato dal downloader."""
+        try:
+            if self.driver:
+                self.driver.quit()
+        except Exception:
+            pass
+        self.driver = None
+        if self._chrome_proc is not None:
+            try:
+                self._chrome_proc.terminate()
+            except Exception:
+                pass
+            self._chrome_proc = None
+        time.sleep(2)
+
+    def _attach_selenium(self, port: int):
+        """Crea (o ricrea) la sessione Selenium agganciata a un Chrome gia' avviato."""
+        attach_options = Options()
+        attach_options.debugger_address = f"127.0.0.1:{port}"
+        attach_options.set_capability('goog:loggingPrefs', {'performance': 'ALL'})
+        return webdriver.Chrome(options=attach_options)
+
+    def _ensure_session(self) -> bool:
+        """Verifica che la sessione Selenium sia viva e, se morta, si riaggancia.
+
+        La verifica Cloudflare chiude e riapre la scheda: in quel caso
+        chromedriver perde la sessione. Il browser resta vivo, basta
+        ricollegarsi.
+        """
+        if self.driver is not None:
+            try:
+                self.driver.title
+                return True
+            except WebDriverException:
+                pass
+        if self._debugger_port:
+            try:
+                self.driver = self._attach_selenium(self._debugger_port)
+                self.wait = WebDriverWait(self.driver, 30)
+                return True
+            except Exception:
+                return False
+        return False
+
     def _init_chrome(self):
         """Initialize Chrome browser with options"""
         print("🌐 Launching Chrome..." if self.language == 'en' else "🌐 Ouverture de Chrome...")
-
-        chromedriver_autoinstaller.install()
 
         chrome_options = Options()
         chrome_options.add_argument('--disable-blink-features=AutomationControlled')
@@ -233,8 +360,34 @@ class IndeedDownloader:
         }
         chrome_options.add_experimental_option("prefs", prefs)
 
-        self.driver = webdriver.Chrome(options=chrome_options)
-        self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+        port = self._attach_to_real_chrome()
+        if port:
+            # Aggancio a un Chrome gia' avviato: le opzioni di avvio
+            # (excludeSwitches, prefs...) non sono valide in questo caso.
+            self._debugger_port = port
+            try:
+                self.driver = self._attach_selenium(port)
+            except Exception as e:
+                print(f"   ⚠️  Aggancio DevTools fallito ({e}), uso chromedriver" if self.language == 'en'
+                      else f"   ⚠️  Échec de l'attachement DevTools ({e}), chromedriver utilisé")
+                self.driver = None
+            if self.driver:
+                print("   ✅ Chrome avviato (sessione reale)" if self.language == 'en'
+                      else "   ✅ Chrome lancé (session réelle)")
+                # La cartella di download si imposta via CDP: le prefs valgono
+                # solo quando e' chromedriver a lanciare Chrome.
+                try:
+                    self.driver.execute_cdp_cmd("Page.setDownloadBehavior", {
+                        "behavior": "allow",
+                        "downloadPath": str(Path(self.download_folder).absolute()),
+                    })
+                except Exception:
+                    pass
+
+        if self.driver is None:
+            chromedriver_autoinstaller.install()
+            self.driver = webdriver.Chrome(options=chrome_options)
+            self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
         self.driver.maximize_window()
         self.wait = WebDriverWait(self.driver, 30)
 
@@ -278,9 +431,61 @@ class IndeedDownloader:
         time.sleep(3)
         return injected
 
+    def _navigate_to_jobs(self, url: str) -> None:
+        """Porta la pagina sulla lista offerte senza ricaricarla a vuoto.
+
+        La SPA di Indeed si blocca (scheletro vuoto) quando la stessa
+        pagina viene ricaricata nella stessa scheda: se si e' gia' sulla
+        lista offerte con lo stesso filtro non si rinaviga.
+        """
+        current = ""
+        try:
+            current = self.driver.current_url or ""
+        except WebDriverException:
+            pass
+        if current.startswith("https://employers.indeed.com/jobs"):
+            cur_status = parse_qs(urlparse(current).query).get('status', [''])[0]
+            new_status = parse_qs(urlparse(url).query).get('status', [''])[0]
+            if cur_status and cur_status == new_status:
+                return
+        self.driver.get(url)
+
+    def _open_jobs_in_new_tab(self, url: str) -> None:
+        """Riapre la lista offerte in una scheda nuova (renderer pulito)."""
+        self.driver.switch_to.new_window('tab')
+        self.driver.get(url)
+
+    def _wait_for_page_ready(self, timeout: int = 60) -> str:
+        """Aspetta che la pagina aperta in Chrome sia pronta.
+
+        Ritorna 'ready', 'challenge' (verifica Cloudflare da superare) o
+        'timeout'.
+        """
+        elapsed = 0
+        while elapsed < timeout:
+            time.sleep(3)
+            elapsed += 3
+            if not self._ensure_session():
+                continue
+            try:
+                body = self.driver.execute_script("return document.body.innerText") or ""
+            except WebDriverException:
+                continue
+            if self._is_cloudflare_challenge():
+                return 'challenge'
+            if len(body.strip()) > 400:
+                return 'ready'
+        return 'timeout'
+
     def _is_logged_in(self) -> bool:
         """Check if we are logged in to Indeed Employer dashboard"""
         try:
+            if not self._ensure_session():
+                return False
+            # La pagina di verifica Cloudflare risponde con un DOM vuoto: senza
+            # questo controllo sembrerebbe un login riuscito.
+            if self._is_cloudflare_challenge():
+                return False
             current_url = self.driver.current_url
             # If redirected to login/auth page, not logged in
             if any(x in current_url for x in ['/auth', '/login', 'secure.indeed.com', 'accounts.indeed.com']):
@@ -377,11 +582,30 @@ class IndeedDownloader:
         profile_copy = os.getenv('CHROME_COPY_PROFILE', '')
         if profile_copy and Path(profile_copy).is_dir():
             print("🔑 Copied profile session found, checking login..." if self.language == 'en' else "🔑 Profil copié trouvé, vérification de la connexion...")
-            self.driver.get("https://employers.indeed.com/candidates")
-            time.sleep(4)
+            # Si parte da /jobs: la pagina /candidates fa scattare il
+            # controllo anti-bot di Cloudflare sulle visite successive a
+            # /jobs. Inoltre la SPA si blocca se la pagina viene ricaricata
+            # con i query param: meglio l'URL nudo, l'app fa il redirect.
+            if self._ensure_session():
+                self.driver.get(JOBS_URL)
+            state = self._wait_for_page_ready(timeout=90)
+            if state == 'challenge':
+                self._wait_for_cloudflare()
+                state = self._wait_for_page_ready(timeout=60)
+            if state == 'timeout':
+                # La SPA non parte: Chrome nuovo, una sola navigazione.
+                print("   ↻ Riavvio Chrome..." if self.language == 'en'
+                      else "   ↻ Redémarrage de Chrome...")
+                self._kill_chrome()
+                self._init_chrome()
+                self.driver.get(JOBS_URL)
+                state = self._wait_for_page_ready(timeout=90)
+            if state != 'ready':
+                print("⚠️  Indeed page not ready" if self.language == 'en' else "⚠️  Page Indeed non prête")
 
             if self._is_logged_in():
                 print("✅ Logged in with copied profile session" if self.language == 'en' else "✅ Connecté avec la session du profil copié")
+                self._capture_browser_cookies()
                 self._capture_api_key()
                 return True
             else:
@@ -395,8 +619,13 @@ class IndeedDownloader:
             self._inject_cookies(saved_cookies)
 
             # Navigate to employer dashboard to check if session is valid
-            self.driver.get("https://employers.indeed.com/candidates")
-            time.sleep(4)
+            self.driver.get("https://employers.indeed.com/jobs")
+            time.sleep(5)
+            if not self._ensure_session():
+                print("⚠️  Chrome session lost" if self.language == 'en' else "⚠️  Session Chrome perdue")
+                return False
+            if self._is_cloudflare_challenge():
+                self._wait_for_cloudflare()
 
             if self._is_logged_in():
                 print("✅ Logged in with saved cookies" if self.language == 'en' else "✅ Connecté avec les cookies sauvegardés")
@@ -425,30 +654,45 @@ class IndeedDownloader:
         print("✅ Authentication successful!" if self.language == 'en' else "✅ Authentification réussie!")
         return True
 
+    def _scan_api_key(self) -> bool:
+        """Cerca l'API key nei log di rete della pagina corrente."""
+        try:
+            logs = self.driver.get_log('performance')
+        except Exception:
+            return False
+        for log in logs:
+            try:
+                message = json.loads(log['message'])['message']
+                if message['method'] == 'Network.requestWillBeSent':
+                    url = message['params']['request']['url']
+                    if 'graphql' in url and 'apis.indeed.com' in url:
+                        headers = message['params']['request']['headers']
+                        if 'indeed-api-key' in headers:
+                            self.api_key = headers['indeed-api-key']
+                            return True
+            except (KeyError, json.JSONDecodeError):
+                continue
+        return False
+
     def _capture_api_key(self):
         """Capture API key from network logs"""
         try:
+            # I log di rete contengono le richieste fatte dopo l'attach a
+            # Chrome: la pagina corrente basta, non serve /candidates.
+            if self._scan_api_key():
+                print("   ✅ API key captured" if self.language == 'en' else "   ✅ API Key capturée")
+                return
+
             current_url = self.driver.current_url
             if 'candidates' not in current_url:
+                # Fallback: la pagina dei candidati emette la chiamata GraphQL.
                 self.driver.get("https://employers.indeed.com/candidates")
                 time.sleep(5)
 
-            logs = self.driver.get_log('performance')
-            for log in logs:
-                try:
-                    message = json.loads(log['message'])['message']
-                    if message['method'] == 'Network.requestWillBeSent':
-                        url = message['params']['request']['url']
-                        if 'graphql' in url and 'apis.indeed.com' in url:
-                            headers = message['params']['request']['headers']
-                            if 'indeed-api-key' in headers:
-                                self.api_key = headers['indeed-api-key']
-                                break
-                except (KeyError, json.JSONDecodeError):
-                    continue
-
-            if self.api_key:
+            if self._scan_api_key():
                 print("   ✅ API key captured" if self.language == 'en' else "   ✅ API Key capturée")
+            else:
+                print("   ⚠️  API key not captured" if self.language == 'en' else "   ⚠️  API Key non capturée")
         except Exception:
             pass
 
@@ -516,6 +760,64 @@ class IndeedDownloader:
 
         self.current_job_folder = job_folder
         return job_folder
+
+    def _is_cloudflare_challenge(self) -> bool:
+        """True se la pagina aperta e' la verifica anti-bot di Cloudflare.
+
+        Indeed mette sotto Cloudflare la pagina /jobs: senza un cf_clearance
+        valido si vede "Ulteriore verifica richiesta" e la tabella dei job
+        non viene mai renderizzata. La verifica si supera spuntando la
+        casella nella finestra Chrome aperta.
+        """
+        try:
+            title = (self.driver.title or "").lower()
+            if any(m in title for m in ("just a moment", "security check", "attention required")):
+                return True
+            body = (self.driver.execute_script("return document.body.innerText") or "").lower()
+            return "ray id" in body and "cloudflare" in body
+        except Exception:
+            return False
+
+    def _wait_for_cloudflare(self, max_wait: int = 240) -> bool:
+        """Aspetta che l'utente superi la verifica Cloudflare nella finestra Chrome.
+
+        Ritorna True se la verifica sparisce, False se scade il tempo.
+        """
+        if not self._is_cloudflare_challenge():
+            return True
+        print("\n🛡️  VERIFICA CLOUDFLARE" if self.language == 'en'
+              else "\n🛡️  VERIFICA CLOUDFLARE")
+        print("=" * 60)
+        print("   Indeed chiede una verifica anti-bot sulla pagina delle offerte."
+              if self.language == 'en'
+              else "   Indeed chiede una verifica anti-bot sulla pagina delle offerte.")
+        print("   Spunta la casella nella finestra Chrome (se non parte da sola)."
+              if self.language == 'en'
+              else "   Spunta la casella nella finestra Chrome (se non parte da sola).")
+        print("=" * 60)
+        elapsed = 0
+        while elapsed < max_wait:
+            time.sleep(3)
+            elapsed += 3
+            try:
+                if not self._is_cloudflare_challenge():
+                    print("   ✅ Verifica superata!" if self.language == 'en'
+                          else "   ✅ Vérification réussie!")
+                    time.sleep(2)
+                    return True
+            except Exception:
+                continue
+            if elapsed % 15 == 0:
+                try:
+                    self.driver.refresh()
+                except Exception:
+                    pass
+                print(f"   ⏳ In attesa della verifica... ({elapsed}s)" if self.language == 'en'
+                      else f"   ⏳ En attente de la vérification... ({elapsed}s)")
+        print("   ❌ Verifica non superata: riprova chiudendo Chrome e rilanciando."
+              if self.language == 'en'
+              else "   ❌ Vérification non réussie: réessaie en fermant Chrome.")
+        return False
 
     def _close_modals(self):
         """Close any modal/popup that might be open"""
@@ -1407,6 +1709,16 @@ class IndeedDownloader:
             print(f"      Pagination error: {e}" if self.language == 'en' else f"      Erreur pagination: {e}")
         return False
 
+    def _wait_for_job_table(self, timeout: int = 90) -> bool:
+        """Aspetta che la tabella dei job venga renderizzata dalla SPA."""
+        try:
+            WebDriverWait(self.driver, timeout).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "tr[data-testid='job-row']"))
+            )
+            return True
+        except TimeoutException:
+            return False
+
     def fetch_all_jobs(self) -> list:
         """Fetch all jobs from HTML table with pagination"""
         print("\nRetrieving job list..." if self.language == 'en' else "\nRecuperation de la liste des jobs...")
@@ -1421,19 +1733,36 @@ class IndeedDownloader:
             status_params.append('closed')
 
         status_str = ','.join(status_params)
-        jobs_url = f"https://employers.indeed.com/jobs?status={status_str}"
+        # La SPA di Indeed resta appesa se la pagina viene caricata con i
+        # query param: si usa l'URL nudo e si filtra in base allo stato
+        # (l'app mostra gia' aperti + sospesi).
+        jobs_url = JOBS_URL
+        if len(status_params) != 2 or 'open' not in status_params or 'paused' not in status_params:
+            status_enc = '%2C'.join(status_params)
+            jobs_url = (
+                f"https://employers.indeed.com/jobs?status={status_enc}"
+                "&claimed=false&createdOnIndeed=true&tab=0"
+                "&sortDirection=DESC&sortField=datePostedOnIndeed"
+            )
 
         print(f"   URL: {jobs_url}")
-        self.driver.get(jobs_url)
+        self._navigate_to_jobs(jobs_url)
         time.sleep(4)
         self._close_modals()
-        try:
-            WebDriverWait(self.driver, 15).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "tr[data-testid='job-row']"))
-            )
-        except TimeoutException:
-            print("Job table not found" if self.language == 'en' else "Tableau des jobs non trouve")
-            return []
+        # La pagina /jobs e' spesso protetta da Cloudflare: senza intervento
+        # la tabella dei job non esiste e si conclude con "0 jobs".
+        self._wait_for_cloudflare()
+        # La SPA di Indeed carica la tabella dei job con parecchio ritardo:
+        # se non arriva si riprova con un Chrome nuovo (una sola navigazione).
+        if not self._wait_for_job_table(timeout=90):
+            print("   ↻ Table not rendered, restarting Chrome..." if self.language == 'en'
+                  else "   ↻ Tableau non rendu, redémarrage de Chrome...")
+            self._kill_chrome()
+            self._init_chrome()
+            self.driver.get(jobs_url)
+            if not self._wait_for_job_table(timeout=90):
+                print("Job table not found" if self.language == 'en' else "Tableau des jobs non trouve")
+                return []
 
         # Close any modals that might appear
         self._close_modals()
@@ -1829,6 +2158,7 @@ class IndeedDownloader:
                 # Navigate to job
                 self.driver.get(f"https://employers.indeed.com/candidates?selectedJobs={job['id']}")
                 time.sleep(3)
+                self._wait_for_cloudflare()
                 # Close any modals that might appear
                 self._close_modals()
                 self._download_all_candidates_frontend()
@@ -1984,7 +2314,15 @@ class IndeedDownloader:
         finally:
             if self.driver:
                 input("\nPress Enter to close Chrome..." if self.language == 'en' else "\nAppuyez sur Entrée pour fermer Chrome...")
-                self.driver.quit()
+                try:
+                    self.driver.quit()
+                except Exception:
+                    pass
+            if self._chrome_proc is not None:
+                try:
+                    self._chrome_proc.terminate()
+                except Exception:
+                    pass
 
 
 def main():
