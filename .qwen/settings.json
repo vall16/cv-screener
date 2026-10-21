@@ -54,7 +54,11 @@
       "Bash(where *)",
       "Bash(chromedriver *)",
       "Bash(c:\\users\\vallo\\cv-screener\\backend\\.venv\\scripts\\python *)",
-      "Bash(c:\\users\\vallo\\appdata\\local\\programs\\python\\python313\\python *)"
+      "Bash(c:\\users\\vallo\\appdata\\local\\programs\\python\\python313\\python *)",
+      "Bash(robocopy *)",
+      "Bash(git status *)",
+      "Bash(head *)",
+      "Bash(find *)"
     ]
   },
   "$version": 4

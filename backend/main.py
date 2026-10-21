@@ -4,6 +4,7 @@ import io
 import json
 import logging
 import os
+import platform
 import shutil
 import subprocess
 import zipfile
@@ -394,9 +395,18 @@ pre {{ background: #f5f5f5; padding: 8px; font-size: 10px; }}
 
 
 # ── Indeed ────────────────────────────────────────────
-INDEED_DIR = Path.home() / "indeedBulkResumesDownloader"
+# Il downloader puo' vivere dentro il progetto (deploy monolitico, es. server
+# Ubuntu) oppure nella home (layout legacy Windows). Preferiamo quello nel
+# progetto se presente; altrimenti fallback alla home.
+_PROJECT_INDEED = BASE_DIR / "indeed-downloader"
+_HOME_INDEED = Path.home() / "indeedBulkResumesDownloader"
+INDEED_DIR = _PROJECT_INDEED if (_PROJECT_INDEED / "indeed_downloader.py").is_file() else _HOME_INDEED
 INDEED_DOWNLOADS = INDEED_DIR / "downloads"
-INDEED_PYTHON = INDEED_DIR / ".venv" / "Scripts" / "python.exe"
+_IS_WINDOWS = platform.system() == "Windows"
+if _IS_WINDOWS:
+    INDEED_PYTHON = INDEED_DIR / ".venv" / "Scripts" / "python.exe"
+else:
+    INDEED_PYTHON = INDEED_DIR / ".venv" / "bin" / "python"
 
 # Stato del downloader in-process
 import threading
@@ -417,16 +427,25 @@ def _profile_copy_ok() -> bool:
 
 
 def _any_chrome_running() -> bool:
-    """True se c'e' almeno un processo Chrome attivo."""
+    """True se c'e' almeno un processo Chrome/Chromium attivo."""
     try:
+        if _IS_WINDOWS:
+            out = subprocess.run(
+                ["tasklist", "/FI", "IMAGENAME eq chrome.exe", "/NH"],
+                capture_output=True,
+                text=True,
+                errors="replace",
+                timeout=5,
+            )
+            return "chrome.exe" in out.stdout
         out = subprocess.run(
-            ["tasklist", "/FI", "IMAGENAME eq chrome.exe", "/NH"],
+            ["pgrep", "-f", "chrome"],
             capture_output=True,
             text=True,
             errors="replace",
             timeout=5,
         )
-        return "chrome.exe" in out.stdout
+        return out.returncode == 0
     except Exception:
         return False
 
@@ -439,22 +458,42 @@ def _ensure_profile_copy() -> None:
     La copia viene aggiornata ad ogni launch per avere cookie freschi.
     Funziona anche con Chrome aperto (robocopy salta i file bloccati).
     """
-    user_data = Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))) / "Google" / "Chrome" / "User Data"
-    if not (user_data / "Local State").is_file():
-        raise HTTPException(status_code=500, detail="Profilo Chrome non trovato in " + str(user_data))
-    CHROME_COPY_PROFILE.mkdir(parents=True, exist_ok=True)
     exclusions = (
         "Cache", "Code Cache", "GPUCache", "GrShaderCache",
         "DawnGraphiteCache", "DawnWebGPUCache", "Service Worker", "CachedData",
     )
-    cmd = [
-        "robocopy", str(user_data), str(CHROME_COPY_PROFILE), "/E",
-        "/R:1", "/W:1", "/NFL", "/NDL", "/NJH", "/NJS",
-    ]
-    for folder in exclusions:
-        cmd += ["/XD", folder]
-    logger.info("Aggiornamento copia profilo Chrome...")
-    subprocess.run(cmd, timeout=600)
+    if _IS_WINDOWS:
+        user_data = Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))) / "Google" / "Chrome" / "User Data"
+        if not (user_data / "Local State").is_file():
+            raise HTTPException(status_code=500, detail="Profilo Chrome non trovato in " + str(user_data))
+        CHROME_COPY_PROFILE.mkdir(parents=True, exist_ok=True)
+        cmd = [
+            "robocopy", str(user_data), str(CHROME_COPY_PROFILE), "/E",
+            "/R:1", "/W:1", "/NFL", "/NDL", "/NJH", "/NJS",
+        ]
+        for folder in exclusions:
+            cmd += ["/XD", folder]
+        logger.info("Aggiornamento copia profilo Chrome...")
+        subprocess.run(cmd, timeout=600)
+    else:
+        candidates = (
+            Path.home() / ".config" / "google-chrome",
+            Path.home() / ".config" / "chromium",
+            Path.home() / ".config" / "chromium-browser",
+        )
+        user_data = next((c for c in candidates if (c / "Local State").is_file()), None)
+        if user_data is None:
+            raise HTTPException(
+                status_code=500,
+                detail="Profilo Chrome/Chromium non trovato in ~/.config (google-chrome, chromium, chromium-browser).",
+            )
+        CHROME_COPY_PROFILE.mkdir(parents=True, exist_ok=True)
+        logger.info("Aggiornamento copia profilo Chrome/Chromium...")
+        shutil.copytree(
+            user_data, CHROME_COPY_PROFILE,
+            dirs_exist_ok=True,
+            ignore=lambda names: {n for n in names if n in exclusions},
+        )
     if not _profile_copy_ok():
         raise HTTPException(
             status_code=500,
@@ -478,7 +517,7 @@ def api_indeed_launch():
     """Avvia il downloader Indeed: aggiorna la copia profilo e lancia il downloader."""
     global _indeed_proc, _indeed_lines
     if not INDEED_DIR.is_dir():
-        raise HTTPException(status_code=404, detail="Cartella indeedBulkResumesDownloader non trovata in " + str(Path.home()))
+        raise HTTPException(status_code=404, detail="Cartella downloader Indeed non trovata in " + str(INDEED_DIR))
     script = INDEED_DIR / "indeed_downloader.py"
     if not script.is_file():
         raise HTTPException(status_code=404, detail="indeed_downloader.py non trovato")
