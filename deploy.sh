@@ -4,15 +4,13 @@
 # Esegue i passi 3-4 di DEPLOY.md: setup (backend + frontend) e avvio via systemd.
 #
 # Uso (sul server, come root):
-#   1) Trasferisci cv-screener.zip in /home/wvallone (WinSCP / scp)
-#   2) cd /home/wvallone && unzip cv-screener.zip
-#   3) bash /home/wvallone/cv-screener/deploy.sh
+#   1) Copia la cartella cv-screener in /home/wvallone (WinSCP / scp)
+#   2) sudo bash /home/wvallone/cv-screener/deploy.sh
 #
 set -euo pipefail
 
 # ---------------- Configurazione ----------------
 APP_DIR="/home/wvallone/cv-screener"
-ZIP="/home/wvallone/cv-screener.zip"
 PORT=8000
 SERVICE="cv-screener"
 SERVICE_FILE="/etc/systemd/system/${SERVICE}.service"
@@ -27,17 +25,9 @@ log "Controllo prerequisiti"
 command -v python3 >/dev/null 2>&1 || die "python3 non trovato (serve Python 3.11+)"
 command -v node    >/dev/null 2>&1 || die "node non trovato (serve Node.js 20+)"
 command -v npm     >/dev/null 2>&1 || die "npm non trovato"
-command -v unzip   >/dev/null 2>&1 || die "unzip non trovato (apt install unzip)"
 
-# ---------------- 1. Estrazione ----------------
-if [ ! -d "$APP_DIR" ]; then
-  [ -f "$ZIP" ] || die "Né $APP_DIR né $ZIP esistono. Trasferisci prima cv-screener.zip in /home/wvallone."
-  log "Estrazione di $ZIP in /home/wvallone"
-  cd /home/wvallone
-  unzip -o "$ZIP" -d "$APP_DIR"
-else
-  log "Cartella $APP_DIR già presente (salto l'estrazione)"
-fi
+# ---------------- 1. Verifica cartella app ----------------
+[ -d "$APP_DIR" ] || die "Cartella $APP_DIR non trovata. Copia prima cv-screener in /home/wvallone."
 
 # ---------------- 2. Backend ----------------
 log "Setup backend (venv + dipendenze)"
