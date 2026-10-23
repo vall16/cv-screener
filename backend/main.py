@@ -416,6 +416,7 @@ _indeed_lock = threading.Lock()
 
 
 CHROME_COPY_PROFILE = INDEED_DIR / "chrome-profile-copy"
+CHROME_FALLBACK_PROFILE = INDEED_DIR / "chrome-profile-fallback"
 INDEED_COOKIES = INDEED_DIR / "logs" / "indeed_cookies.json"
 
 
@@ -529,7 +530,8 @@ def _ensure_profile_copy() -> str | None:
         if not (user_data / "Local State").is_file():
             raise HTTPException(status_code=500, detail="Profilo Chrome non trovato in " + str(user_data))
         CHROME_COPY_PROFILE.mkdir(parents=True, exist_ok=True)
-        if _chrome_running():
+        chrome_open = _chrome_running()
+        if chrome_open and _profile_copy_ok():
             # Chrome aperto: i file del profilo sono bloccati e una copia
             # parziale rovinerebbe la sessione gia' presente (cookie
             # Cloudflare inclusi). Si resta sulla copia gia' valida.
@@ -537,6 +539,16 @@ def _ensure_profile_copy() -> str | None:
             return (
                 "Chrome aperto: uso la copia profilo gia' sincronizzata. "
                 "Chiudi Chrome per aggiornare la sessione."
+            )
+        if chrome_open and not _is_admin():
+            # Nessuna copia valida e Chrome aperto: senza privilegi elevati
+            # i file bloccati (Cookies) non si possono leggere. Si usa un
+            # profilo dedicato invece di bloccare il download.
+            logger.info("Chrome aperto: uso un profilo dedicato")
+            return (
+                "Chrome aperto: non posso copiare la sessione dal profilo in uso. "
+                "Avvio Chrome con un profilo dedicato: se richiesto, accedi a Indeed "
+                "nella finestra che si apre. Chiudi Chrome per riusare la tua sessione."
             )
         cmd = ["robocopy", str(user_data), str(CHROME_COPY_PROFILE), "/E"]
         if _is_admin():
@@ -580,9 +592,10 @@ def _ensure_profile_copy() -> str | None:
                 "Copia del profilo Chrome non utilizzabile (nessun Cookies). "
                 "Procedo con i cookie salvati: loggati su Indeed nella finestra se richiesto."
             )
-        raise HTTPException(
-            status_code=500,
-            detail="Copia del profilo Chrome non utilizzabile. Chiudi Chrome una volta e riprova.",
+        logger.warning("Copia del profilo Chrome non utilizzabile: uso un profilo dedicato")
+        return (
+            "Copia del profilo Chrome non utilizzabile: avvio Chrome con un profilo "
+            "dedicato. Se richiesto, accedi a Indeed nella finestra che si apre."
         )
     return warning
 
@@ -652,13 +665,19 @@ def api_indeed_launch():
         env["PYTHONUNBUFFERED"] = "1"
         if _profile_copy_ok():
             env["CHROME_COPY_PROFILE"] = str(CHROME_COPY_PROFILE)
+        elif _chrome_running():
+            # Nessuna copia valida ma Chrome aperto: un Chrome lanciato senza
+            # --user-data-dir si aggancerebbe all'istanza gia' aperta, senza
+            # porta DevTools. Si usa una cartella profilo dedicata.
+            CHROME_FALLBACK_PROFILE.mkdir(parents=True, exist_ok=True)
+            env["CHROME_COPY_PROFILE"] = str(CHROME_FALLBACK_PROFILE)
+            fallback = (
+                "Chrome aperto: uso un profilo dedicato. Se richiesto, accedi a "
+                "Indeed nella finestra che si apre."
+            )
+            warning = (warning + " " + fallback) if warning else fallback
         else:
             env.pop("CHROME_COPY_PROFILE", None)
-            if _chrome_running():
-                raise HTTPException(
-                    status_code=409,
-                    detail="Copia profilo Chrome non disponibile e Chrome è aperto. Chiudi Chrome e riprova.",
-                )
         _indeed_proc = subprocess.Popen(
             [python, runner, str(script)],
             cwd=str(INDEED_DIR),

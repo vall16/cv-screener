@@ -59,7 +59,8 @@
       "Bash(git status *)",
       "Bash(head *)",
       "Bash(find *)",
-      "Bash(cmd *)"
+      "Bash(cmd *)",
+      "Bash(build-cv-screener-portable.bat)"
     ]
   },
   "$version": 4

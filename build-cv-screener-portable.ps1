@@ -251,8 +251,13 @@ della web UI, ma serve:
 - Google Chrome installato e con accesso a Indeed Employer;
 - idealmente Chrome chiuso durante l'aggiornamento della sessione.
 
-Se Chrome e' aperto e la copia del profilo fallisce, avvia il programma con
-AVVIA-CV-SCREENER-ADMIN.cmd (chiede i privilegi di amministratore).
+Se Chrome e' aperto al primo avvio, la sessione non puo' essere copiata: il
+programma usa un profilo Chrome dedicato e, se richiesto, ti fa accedere a
+Indeed nella finestra che si apre (una sola volta). Per riusare la sessione
+del tuo Chrome, chiudi Chrome e riavvia il downloader.
+
+Con AVVIA-CV-SCREENER-ADMIN.cmd i privilegi di amministratore permettono di
+copiare il profilo anche mentre Chrome e' aperto.
 
 Nel pannello, se compare un menu nel log, scegli: 1 - 1 - 2 - 4
 (English, Backend API, All jobs, Active+Paused). Se chiede il login,
