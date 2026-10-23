@@ -188,12 +188,31 @@ if not exist "%~dp0frontend\dist\cv-screener\browser\index.html" (
 )
 
 powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }" >nul 2>nul
+timeout /t 1 >nul
+powershell -NoProfile -Command "if (Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue) { exit 1 } else { exit 0 }"
+if errorlevel 1 (
+    if /I "%~1"=="elevated" (
+        echo  [ERRORE] La porta 8000 e' occupata da un processo che non riesco a chiudere.
+        echo          Chiudi l'altra finestra di CV Screener oppure riavvia il PC.
+        echo.
+        pause
+        exit /b 1
+    )
+    echo  La porta 8000 e' occupata da un'istanza avviata come amministratore.
+    echo  Chiedo i privilegi per chiuderla: conferma nella finestra di Windows.
+    powershell -NoProfile -Command "Start-Process -FilePath '%~f0' -ArgumentList 'elevated' -Verb RunAs"
+    if errorlevel 1 (
+        echo  Richiesta annullata. Chiudi manualmente l'altra istanza e riprova.
+        pause
+    )
+    exit /b
+)
 
 echo  Avvio su http://127.0.0.1:8000
 echo  Chiudi questa finestra per fermare CV Screener.
 echo.
 
-start "" /b powershell -NoProfile -WindowStyle Hidden -Command "Start-Sleep -Seconds 3; Start-Process explorer.exe -ArgumentList 'http://127.0.0.1:8000'"
+start "" /b powershell -NoProfile -WindowStyle Hidden -Command "$u='http://127.0.0.1:8000/api/health'; for($i=0;$i -lt 120;$i++){ try { $r=Invoke-WebRequest -UseBasicParsing $u -TimeoutSec 2; if($r.StatusCode -eq 200){ Start-Process explorer.exe -ArgumentList 'http://127.0.0.1:8000'; break } } catch {}; Start-Sleep -Milliseconds 500 }"
 
 cd backend
 python -m uvicorn main:app --host 127.0.0.1 --port 8000
@@ -251,13 +270,15 @@ della web UI, ma serve:
 - Google Chrome installato e con accesso a Indeed Employer;
 - idealmente Chrome chiuso durante l'aggiornamento della sessione.
 
-Se Chrome e' aperto al primo avvio, la sessione non puo' essere copiata: il
-programma usa un profilo Chrome dedicato e, se richiesto, ti fa accedere a
-Indeed nella finestra che si apre (una sola volta). Per riusare la sessione
-del tuo Chrome, chiudi Chrome e riavvia il downloader.
+Se Chrome e' aperto, la sessione non puo' essere copiata: il programma usa
+subito un profilo Chrome dedicato (nessuna attesa) e, se richiesto, ti fa
+accedere a Indeed nella finestra che si apre (una sola volta). Per riusare la
+sessione del tuo Chrome, chiudi Chrome e riavvia il downloader: la copia
+avviene in automatico.
 
-Con AVVIA-CV-SCREENER-ADMIN.cmd i privilegi di amministratore permettono di
-copiare il profilo anche mentre Chrome e' aperto.
+Nota: la copia completa del profilo viene fatta solo a Chrome chiuso, perche'
+con Chrome aperto i file sono bloccati e la copia richiederebbe minuti senza
+portare a un risultato utilizzabile.
 
 Nel pannello, se compare un menu nel log, scegli: 1 - 1 - 2 - 4
 (English, Backend API, All jobs, Active+Paused). Se chiede il login,

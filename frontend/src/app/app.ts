@@ -902,7 +902,10 @@ export class App implements OnInit, OnDestroy {
     this.openIndeedModal();
     try {
       const r = await firstValueFrom(this.api.indeedLaunch());
-      this.indeedLines = [r.message || 'Downloader avviato. In attesa del menu…'];
+      // Non sovrascrivere l'output gia' arrivato dal processo durante l'avvio.
+      if (!this.indeedLines.length) {
+        this.indeedLines = [r.message || 'Downloader avviato. In attesa del menu…'];
+      }
     } catch (e: unknown) {
       const err = e as { error?: { detail?: string } };
       this.indeedLines = ['ERRORE: ' + (err?.error?.detail ?? 'Impossibile avviare il downloader.')];

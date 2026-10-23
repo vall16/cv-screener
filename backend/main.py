@@ -506,50 +506,74 @@ def _chrome_running() -> bool:
     return bool(out)
 
 
-def _ensure_profile_copy() -> str | None:
+def _profile_in_use(user_data: Path) -> bool:
+    """True se Chrome sta usando il profilo (file Cookies bloccato).
+
+    Su Windows un file aperto in scrittura da Chrome non e' leggibile: e' un
+    modo rapido e affidabile di capire se il profilo e' in uso, senza dover
+    scandire i processi.
+    """
+    for rel in ("Default/Network/Cookies", "Default/Cookies"):
+        cookie = user_data / rel
+        if not cookie.is_file():
+            continue
+        try:
+            with open(cookie, "rb") as fh:
+                fh.read(1)
+        except PermissionError:
+            return True
+        except OSError:
+            continue
+    return False
+
+
+def _ensure_profile_copy() -> tuple[str | None, bool]:
     """Aggiorna la copia del profilo Chrome (stessa sessione, no ri-login).
 
     Il downloader lavora su una COPIA del profilo: stessi cookie/sessione
     (decifrabili sul PC dell'utente), nessun nuovo login.
     La copia viene aggiornata ad ogni launch per avere cookie freschi.
 
-    Chrome tiene bloccati i file del profilo mentre e' aperto: senza
-    privilegi elevati alcuni file (Cookies in primis) non si possono copiare.
-    In quel caso robocopy lascia intatti i file gia' presenti, quindi la copia
-    precedente (con la sessione) resta valida: si avvisa e si va avanti.
+    Con Chrome aperto i file del profilo sono bloccati: copiare l'intero
+    profilo richiede minuti e lascia comunque una copia inutilizzabile
+    (i Cookies non si leggono). In quel caso si usa subito un profilo
+    dedicato, senza far attendere l'avvio. La copia completa viene fatta
+    solo a Chrome chiuso.
 
-    Restituisce un avviso (None se tutto bene).
+    Restituisce (avviso o None, True se Chrome era aperto).
     """
     exclusions = (
         "Cache", "Code Cache", "GPUCache", "GrShaderCache",
         "DawnGraphiteCache", "DawnWebGPUCache", "Service Worker", "CachedData",
     )
     warning = None
+    chrome_open = False
     if _IS_WINDOWS:
         user_data = Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))) / "Google" / "Chrome" / "User Data"
         if not (user_data / "Local State").is_file():
             raise HTTPException(status_code=500, detail="Profilo Chrome non trovato in " + str(user_data))
-        CHROME_COPY_PROFILE.mkdir(parents=True, exist_ok=True)
-        chrome_open = _chrome_running()
-        if chrome_open and _profile_copy_ok():
-            # Chrome aperto: i file del profilo sono bloccati e una copia
-            # parziale rovinerebbe la sessione gia' presente (cookie
-            # Cloudflare inclusi). Si resta sulla copia gia' valida.
-            logger.info("Chrome aperto: salto la sincronizzazione del profilo")
-            return (
-                "Chrome aperto: uso la copia profilo gia' sincronizzata. "
-                "Chiudi Chrome per aggiornare la sessione."
-            )
-        if chrome_open and not _is_admin():
-            # Nessuna copia valida e Chrome aperto: senza privilegi elevati
-            # i file bloccati (Cookies) non si possono leggere. Si usa un
-            # profilo dedicato invece di bloccare il download.
+        chrome_open = _chrome_running() or _profile_in_use(user_data)
+        if chrome_open:
+            if _profile_copy_ok():
+                # Copia gia' valida: i file del profilo sono bloccati, una
+                # nuova copia parziale rovinerebbe la sessione presente.
+                logger.info("Chrome aperto: salto la sincronizzazione del profilo")
+                return (
+                    "Chrome aperto: uso la copia profilo gia' sincronizzata. "
+                    "Chiudi Chrome per aggiornare la sessione.",
+                    True,
+                )
+            # Nessuna copia valida: non si tenta la copia completa (minuti di
+            # attesa per un risultato inutilizzabile). Si usa un profilo
+            # dedicato, creato al volo dal downloader.
             logger.info("Chrome aperto: uso un profilo dedicato")
             return (
                 "Chrome aperto: non posso copiare la sessione dal profilo in uso. "
                 "Avvio Chrome con un profilo dedicato: se richiesto, accedi a Indeed "
-                "nella finestra che si apre. Chiudi Chrome per riusare la tua sessione."
+                "nella finestra che si apre. Chiudi Chrome per riusare la tua sessione.",
+                True,
             )
+        CHROME_COPY_PROFILE.mkdir(parents=True, exist_ok=True)
         cmd = ["robocopy", str(user_data), str(CHROME_COPY_PROFILE), "/E"]
         if _is_admin():
             # /B (backup mode): copia anche i file bloccati da Chrome (es. Cookies).
@@ -590,14 +614,16 @@ def _ensure_profile_copy() -> str | None:
         if INDEED_COOKIES.is_file():
             return (
                 "Copia del profilo Chrome non utilizzabile (nessun Cookies). "
-                "Procedo con i cookie salvati: loggati su Indeed nella finestra se richiesto."
+                "Procedo con i cookie salvati: loggati su Indeed nella finestra se richiesto.",
+                chrome_open,
             )
         logger.warning("Copia del profilo Chrome non utilizzabile: uso un profilo dedicato")
         return (
             "Copia del profilo Chrome non utilizzabile: avvio Chrome con un profilo "
-            "dedicato. Se richiesto, accedi a Indeed nella finestra che si apre."
+            "dedicato. Se richiesto, accedi a Indeed nella finestra che si apre.",
+            chrome_open,
         )
-    return warning
+    return warning, chrome_open
 
 
 def _indeed_reader(proc: subprocess.Popen) -> None:
@@ -655,7 +681,7 @@ def api_indeed_launch():
     with _indeed_lock:
         if _indeed_proc is not None and _indeed_proc.poll() is None:
             raise HTTPException(status_code=409, detail="Downloader già in esecuzione.")
-        warning = _ensure_profile_copy()
+        warning, chrome_open = _ensure_profile_copy()
         _indeed_lines = []
         _kill_profile_chrome()
         python = _indeed_python()
@@ -665,17 +691,18 @@ def api_indeed_launch():
         env["PYTHONUNBUFFERED"] = "1"
         if _profile_copy_ok():
             env["CHROME_COPY_PROFILE"] = str(CHROME_COPY_PROFILE)
-        elif _chrome_running():
+        elif chrome_open:
             # Nessuna copia valida ma Chrome aperto: un Chrome lanciato senza
             # --user-data-dir si aggancerebbe all'istanza gia' aperta, senza
             # porta DevTools. Si usa una cartella profilo dedicata.
             CHROME_FALLBACK_PROFILE.mkdir(parents=True, exist_ok=True)
             env["CHROME_COPY_PROFILE"] = str(CHROME_FALLBACK_PROFILE)
-            fallback = (
-                "Chrome aperto: uso un profilo dedicato. Se richiesto, accedi a "
-                "Indeed nella finestra che si apre."
-            )
-            warning = (warning + " " + fallback) if warning else fallback
+            if not warning or "profilo dedicato" not in warning.lower():
+                fallback = (
+                    "Chrome aperto: uso un profilo dedicato. Se richiesto, accedi a "
+                    "Indeed nella finestra che si apre."
+                )
+                warning = (warning + " " + fallback) if warning else fallback
         else:
             env.pop("CHROME_COPY_PROFILE", None)
         _indeed_proc = subprocess.Popen(
