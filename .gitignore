@@ -32,6 +32,9 @@ CVs/*
 !CVs/sample-*.txt
 CVs/_report/
 
+# ── Build pacchetti portable ────────────────────────────
+dist/
+
 # ── Editor / OS ─────────────────────────────────────────
 .vscode/*
 !.vscode/extensions.json
