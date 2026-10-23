@@ -58,7 +58,8 @@
       "Bash(robocopy *)",
       "Bash(git status *)",
       "Bash(head *)",
-      "Bash(find *)"
+      "Bash(find *)",
+      "Bash(cmd *)"
     ]
   },
   "$version": 4

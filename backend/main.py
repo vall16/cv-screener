@@ -654,6 +654,11 @@ def api_indeed_launch():
             env["CHROME_COPY_PROFILE"] = str(CHROME_COPY_PROFILE)
         else:
             env.pop("CHROME_COPY_PROFILE", None)
+            if _chrome_running():
+                raise HTTPException(
+                    status_code=409,
+                    detail="Copia profilo Chrome non disponibile e Chrome è aperto. Chiudi Chrome e riprova.",
+                )
         _indeed_proc = subprocess.Popen(
             [python, runner, str(script)],
             cwd=str(INDEED_DIR),
