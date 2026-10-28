@@ -74,5 +74,4 @@ chromedriver.exe
 chromedriver
 
 # Chrome profile copies (runtime, migliaia di file)
-chrome-profile/
-chrome-profile-copy/
+chrome-profile*/
