@@ -7,6 +7,7 @@ import subprocess
 import threading
 import time
 import uuid 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -24,7 +25,7 @@ _profiles: dict[str, dict] = {}
 _shortlist: dict[str, dict[str, str]] = {}  # {session_id: {filename: status}}
 _lock = threading.Lock()
 _MAX_OUTPUT_LINES = 500
-_procs: dict[str, subprocess.Popen] = {}  # job_id -> processo qwen in corso
+_procs: dict[str, list[subprocess.Popen]] = {}  # job_id -> processi qwen in corso
 
 
 def _atomic_write(path: Path, data: str) -> None:
@@ -651,11 +652,19 @@ def _run_qwen_once(job_id: str, prompt: str, timeout: int) -> tuple[bool, str | 
         errors="replace",
         env=env,
     )
-    _procs[job_id] = proc
+    with _lock:
+        if job_id not in _procs:
+            _procs[job_id] = []
+        _procs[job_id].append(proc)
     try:
         assert proc.stdout is not None
         for line in proc.stdout:
-            _append_output(_jobs[job_id], line.rstrip("\n"))
+            with _lock:
+                if _jobs.get(job_id):
+                    job = _jobs[job_id]
+                    job["output"].append(line.rstrip("\n"))
+                    if len(job["output"]) > _MAX_OUTPUT_LINES:
+                        job["output"] = job["output"][-_MAX_OUTPUT_LINES:]
         proc.wait(timeout=timeout)
         if proc.returncode == 0:
             return True, None
@@ -667,7 +676,11 @@ def _run_qwen_once(job_id: str, prompt: str, timeout: int) -> tuple[bool, str | 
     except Exception as exc:  # noqa: BLE001
         return False, str(exc)
     finally:
-        _procs.pop(job_id, None)
+        with _lock:
+            if job_id in _procs and proc in _procs[job_id]:
+                _procs[job_id].remove(proc)
+            if job_id in _procs and not _procs[job_id]:
+                _procs.pop(job_id, None)
 
 
 def _run_qwen_with_retry(
@@ -685,6 +698,52 @@ def _run_qwen_with_retry(
     return False, error
 
 
+def _run_single_cv(
+    job_id: str,
+    profile: str,
+    cv_dir: Path,
+    report_dir: Path,
+    cv: str,
+    idx: int,
+    total: int,
+    instructions: str,
+) -> tuple[bool, str]:
+    if _is_cancelled(job_id):
+        return False, "annullato"
+    candidate = _candidate_name(cv)
+    report_name = f"{idx:02d}-{candidate}.md"
+    with _lock:
+        if _jobs.get(job_id):
+            _jobs[job_id]["output"].append(f"\n[{idx}/{total}] {cv} — avvio analisi…\n")
+            if len(_jobs[job_id]["output"]) > _MAX_OUTPUT_LINES:
+                _jobs[job_id]["output"] = _jobs[job_id]["output"][-_MAX_OUTPUT_LINES:]
+    task = (
+        f"Analizza il CV: {cv_dir / cv}\n"
+        f"Profilo target: '{profile}'.\n\n"
+        f"Esegui la procedura completa di screening per questo singolo CV e scrivi il report "
+        f"ESCLUSIVAMENTE nel file: {report_dir / report_name}\n"
+        f"Non scrivere altri file: niente classifica.md, niente altre cartelle."
+    )
+    prompt = f"{instructions}\n\n{task}" if instructions else task
+    ok, err = _run_qwen_with_retry(job_id, prompt, attempts=2, timeout=3600)
+    if _is_cancelled(job_id):
+        return False, "annullato"
+    if ok:
+        with _lock:
+            if _jobs.get(job_id):
+                _jobs[job_id]["output"].append(f"[{idx}/{total}] {cv} — report scritto ({report_name})\n")
+                if len(_jobs[job_id]["output"]) > _MAX_OUTPUT_LINES:
+                    _jobs[job_id]["output"] = _jobs[job_id]["output"][-_MAX_OUTPUT_LINES:]
+        return True, report_name
+    else:
+        with _lock:
+            if _jobs.get(job_id):
+                _jobs[job_id]["output"].append(f"[{idx}/{total}] {cv} — ERRORE: {err}\n")
+                if len(_jobs[job_id]["output"]) > _MAX_OUTPUT_LINES:
+                    _jobs[job_id]["output"] = _jobs[job_id]["output"][-_MAX_OUTPUT_LINES:]
+        return False, err or "errore sconosciuto"
+
+
 def _run(
     job_id: str,
     profile: str,
@@ -692,7 +751,7 @@ def _run(
     session_id: str | None = None,
     cv_names: list[str] | None = None,
 ) -> None:
-    """Screening a sessioni singole: una sessione qwen per CV, poi una finale per la classifica."""
+    """Screening parallelo: più sessioni qwen contemporanee per CV, poi classifica finale."""
     report_dir = _report_dir_for(session_id)
     report_dir.mkdir(parents=True, exist_ok=True)
     if not cv_names:
@@ -707,31 +766,40 @@ def _run(
     instructions = _recruiter_instructions()
     total = len(cv_names)
     failed: list[str] = []
-    for idx, cv in enumerate(cv_names, start=1):
-        if _is_cancelled(job_id):
-            return
-        candidate = _candidate_name(cv)
-        report_name = f"{idx:02d}-{candidate}.md"
-        _append_output(_jobs[job_id], f"\n[{idx}/{total}] {cv} — avvio analisi…\n")
-        task = (
-            f"Analizza il CV: {cv_dir / cv}\n"
-            f"Profilo target: '{profile}'.\n\n"
-            f"Esegui la procedura completa di screening per questo singolo CV e scrivi il report "
-            f"ESCLUSIVAMENTE nel file: {report_dir / report_name}\n"
-            f"Non scrivere altri file: niente classifica.md, niente altre cartelle."
-        )
-        prompt = f"{instructions}\n\n{task}" if instructions else task
-        ok, err = _run_qwen_with_retry(job_id, prompt, attempts=2, timeout=3600)
-        if _is_cancelled(job_id):
-            return
-        if ok:
-            _append_output(_jobs[job_id], f"[{idx}/{total}] {cv} — report scritto ({report_name})\n")
-        else:
-            failed.append(cv)
-            _append_output(_jobs[job_id], f"[{idx}/{total}] {cv} — ERRORE: {err}\n")
+    max_workers = min(3, total)
+    with _lock:
+        if _jobs.get(job_id):
+            _jobs[job_id]["output"].append(f"\nAvvio screening parallelo ({max_workers} worker)...\n")
+            if len(_jobs[job_id]["output"]) > _MAX_OUTPUT_LINES:
+                _jobs[job_id]["output"] = _jobs[job_id]["output"][-_MAX_OUTPUT_LINES:]
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {
+            executor.submit(_run_single_cv, job_id, profile, cv_dir, report_dir, cv, idx, total, instructions): cv
+            for idx, cv in enumerate(cv_names, start=1)
+        }
+        for fut in as_completed(futures):
+            if _is_cancelled(job_id):
+                executor.shutdown(wait=False, cancel_futures=True)
+                return
+            cv = futures[fut]
+            try:
+                ok, res = fut.result()
+                if not ok and res != "annullato":
+                    failed.append(cv)
+            except Exception as exc:
+                failed.append(cv)
+                with _lock:
+                    if _jobs.get(job_id):
+                        _jobs[job_id]["output"].append(f"Errore inatteso su {cv}: {exc}\n")
+                        if len(_jobs[job_id]["output"]) > _MAX_OUTPUT_LINES:
+                            _jobs[job_id]["output"] = _jobs[job_id]["output"][-_MAX_OUTPUT_LINES:]
     if _is_cancelled(job_id):
         return
-    _append_output(_jobs[job_id], f"\n[{total + 1}/{total + 1}] Generazione classifica.md…\n")
+    with _lock:
+        if _jobs.get(job_id):
+            _jobs[job_id]["output"].append(f"\n[{total + 1}/{total + 1}] Generazione classifica.md…\n")
+            if len(_jobs[job_id]["output"]) > _MAX_OUTPUT_LINES:
+                _jobs[job_id]["output"] = _jobs[job_id]["output"][-_MAX_OUTPUT_LINES:]
     task = (
         f"Leggi tutti i report .md nella cartella {report_dir} (ignora classifica.md se esiste) "
         f"e scrivi {report_dir / 'classifica.md'} con tabella comparativa completa, top-3 motivata "
@@ -750,15 +818,20 @@ def _run(
 
 
 def cancel_job(job_id: str) -> bool:
-    """Uccide il processo qwen del job e lo marca come 'cancelled'."""
+    """Uccide i processi qwen del job e lo marca come 'cancelled'."""
     with _lock:
         job = _jobs.get(job_id)
         if job is None or job["status"] != "running":
             return False
-    proc = _procs.get(job_id)
-    if proc is not None and proc.poll() is None:
-        proc.kill()
-        proc.wait()
-    _procs.pop(job_id, None)
+        procs = list(_procs.get(job_id, []))
+    for proc in procs:
+        try:
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait()
+        except Exception:
+            pass
+    with _lock:
+        _procs.pop(job_id, None)
     _finish(job_id, "cancelled", "Job annullato dall'utente")
     return True

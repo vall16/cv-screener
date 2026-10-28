@@ -116,98 +116,139 @@ class IndeedDownloader:
 
     def show_menu(self):
         """Display main menu and get user choices"""
-        print("""
+        env_lang = os.getenv('INDEED_LANG', '').strip()
+        env_mode = os.getenv('INDEED_MODE', '').strip()
+        env_job_mode = os.getenv('INDEED_JOB_MODE', '').strip()
+        env_status = os.getenv('INDEED_STATUS', '').strip()
+        auto = bool(env_lang or env_mode or env_job_mode or env_status)
+
+        if not auto:
+            print("""
 ╔════════════════════════════════════════════════════════════╗
 ║         Indeed CV Downloader - Version Unifiée             ║
 ╚════════════════════════════════════════════════════════════╝
 """)
 
-        # Language selection (new first choice)
-        print("🌐 LANGUAGE / LANGUE:")
-        print("   1. English")
-        print("   2. Français")
-        print()
-
-        while True:
-            choice = input("Choice / Choix (1/2): ").strip()
-            if choice == '1':
-                self.language = 'en'
-                break
-            elif choice == '2':
-                self.language = 'fr'
-                break
-            print("❌ Invalid choice" if self.language == 'en' else "❌ Choix invalide")
-
-        print()
+        # Language selection
+        if env_lang == '1':
+            self.language = 'en'
+        elif env_lang == '2':
+            self.language = 'fr'
+        elif not auto:
+            print("🌐 LANGUAGE / LANGUE:")
+            print("   1. English")
+            print("   2. Français")
+            print()
+            while True:
+                choice = input("Choice / Choix (1/2): ").strip()
+                if choice == '1':
+                    self.language = 'en'
+                    break
+                elif choice == '2':
+                    self.language = 'fr'
+                    break
+                print("❌ Invalid choice" if self.language == 'en' else "❌ Choix invalide")
+            print()
+        else:
+            self.language = 'en'
 
         # Mode selection
-        print("📥 DOWNLOAD MODE:" if self.language == 'en' else "📥 MODE DE TÉLÉCHARGEMENT:")
-        print("   1. Backend (API) - Faster, parallel downloads" if self.language == 'en'
-              else "   1. Backend (API) - Plus rapide, téléchargements parallèles")
-        print("   2. Frontend (Selenium) - More stable, simulated clicks" if self.language == 'en'
-              else "   2. Frontend (Selenium) - Plus stable, clics simulés")
-        print()
-
-        while True:
-            choice = input("Choice (1/2): " if self.language == 'en' else "Choix (1/2): ").strip()
-            if choice == '1':
-                self.mode = 'backend'
-                break
-            elif choice == '2':
-                self.mode = 'frontend'
-                break
-            print("❌ Invalid choice" if self.language == 'en' else "❌ Choix invalide")
-
-        print()
+        if env_mode == '1':
+            self.mode = 'backend'
+        elif env_mode == '2':
+            self.mode = 'frontend'
+        elif not auto:
+            print("📥 DOWNLOAD MODE:" if self.language == 'en' else "📥 MODE DE TÉLÉCHARGEMENT:")
+            print("   1. Backend (API) - Faster, parallel downloads" if self.language == 'en'
+                  else "   1. Backend (API) - Plus rapide, téléchargements parallèles")
+            print("   2. Frontend (Selenium) - More stable, simulated clicks" if self.language == 'en'
+                  else "   2. Frontend (Selenium) - Plus stable, clics simulés")
+            print()
+            while True:
+                choice = input("Choice (1/2): " if self.language == 'en' else "Choix (1/2): ").strip()
+                if choice == '1':
+                    self.mode = 'backend'
+                    break
+                elif choice == '2':
+                    self.mode = 'frontend'
+                    break
+                print("❌ Invalid choice" if self.language == 'en' else "❌ Choix invalide")
+            print()
+        else:
+            self.mode = 'backend'
 
         # Job mode selection
-        print("📋 JOB SELECTION MODE:" if self.language == 'en' else "📋 MODE DE SÉLECTION DES JOBS:")
-        print("   1. Single job - You navigate to the desired job" if self.language == 'en'
-              else "   1. Job unique - Vous naviguez vers le job souhaité")
-        print("   2. All jobs - Automatically iterates through all jobs" if self.language == 'en'
-              else "   2. Tous les jobs - Parcourt automatiquement tous les jobs")
-        print()
-
-        while True:
-            choice = input("Choice (1/2): " if self.language == 'en' else "Choix (1/2): ").strip()
-            if choice == '1':
-                self.job_mode = 'single'
-                break
-            elif choice == '2':
-                self.job_mode = 'all'
-                break
-            print("❌ Invalid choice" if self.language == 'en' else "❌ Choix invalide")
+        if env_job_mode == '1':
+            self.job_mode = 'single'
+        elif env_job_mode == '2':
+            self.job_mode = 'all'
+        elif not auto:
+            print("📋 JOB SELECTION MODE:" if self.language == 'en' else "📋 MODE DE SÉLECTION DES JOBS:")
+            print("   1. Single job - You navigate to the desired job" if self.language == 'en'
+                  else "   1. Job unique - Vous naviguez vers le job souhaité")
+            print("   2. All jobs - Automatically iterates through all jobs" if self.language == 'en'
+                  else "   2. Tous les jobs - Parcourt automatiquement tous les jobs")
+            print()
+            while True:
+                choice = input("Choice (1/2): " if self.language == 'en' else "Choix (1/2): ").strip()
+                if choice == '1':
+                    self.job_mode = 'single'
+                    break
+                elif choice == '2':
+                    self.job_mode = 'all'
+                    break
+                print("❌ Invalid choice" if self.language == 'en' else "❌ Choix invalide")
+        else:
+            self.job_mode = 'all'
 
         # Status filter (only for 'all' mode)
         if self.job_mode == 'all':
-            print()
-            print("📊 JOB STATUS TO PROCESS:" if self.language == 'en' else "📊 STATUT DES ANNONCES À TRAITER:")
-            print("   1. Active only (ACTIVE)" if self.language == 'en' else "   1. Ouvertes uniquement (ACTIVE)")
-            print("   2. Paused only (PAUSED)" if self.language == 'en' else "   2. Suspendues uniquement (PAUSED)")
-            print("   3. Closed only (CLOSED)" if self.language == 'en' else "   3. Fermées uniquement (CLOSED)")
-            print("   4. Active + Paused" if self.language == 'en' else "   4. Ouvertes + Suspendues")
-            print("   5. All (Active + Paused + Closed)" if self.language == 'en'
-                  else "   5. Toutes (Ouvertes + Suspendues + Fermées)")
-            print()
+            if env_status == '1':
+                self.job_statuses = ['ACTIVE']
+            elif env_status == '2':
+                self.job_statuses = ['PAUSED']
+            elif env_status == '3':
+                self.job_statuses = ['CLOSED']
+            elif env_status == '4':
+                self.job_statuses = ['ACTIVE', 'PAUSED']
+            elif env_status == '5':
+                self.job_statuses = ['ACTIVE', 'PAUSED', 'CLOSED']
+            elif not auto:
+                print()
+                print("📊 JOB STATUS TO PROCESS:" if self.language == 'en' else "📊 STATUT DES ANNONCES À TRAITER:")
+                print("   1. Active only (ACTIVE)" if self.language == 'en' else "   1. Ouvertes uniquement (ACTIVE)")
+                print("   2. Paused only (PAUSED)" if self.language == 'en' else "   2. Suspendues uniquement (PAUSED)")
+                print("   3. Closed only (CLOSED)" if self.language == 'en' else "   3. Fermées uniquement (CLOSED)")
+                print("   4. Active + Paused" if self.language == 'en' else "   4. Ouvertes + Suspendues")
+                print("   5. All (Active + Paused + Closed)" if self.language == 'en'
+                      else "   5. Toutes (Ouvertes + Suspendues + Fermées)")
+                print()
+                while True:
+                    choice = input("Choice (1-5): " if self.language == 'en' else "Choix (1-5): ").strip()
+                    if choice == '1':
+                        self.job_statuses = ['ACTIVE']
+                        break
+                    elif choice == '2':
+                        self.job_statuses = ['PAUSED']
+                        break
+                    elif choice == '3':
+                        self.job_statuses = ['CLOSED']
+                        break
+                    elif choice == '4':
+                        self.job_statuses = ['ACTIVE', 'PAUSED']
+                        break
+                    elif choice == '5':
+                        self.job_statuses = ['ACTIVE', 'PAUSED', 'CLOSED']
+                        break
+                    print("❌ Invalid choice" if self.language == 'en' else "❌ Choix invalide")
+            else:
+                self.job_statuses = ['ACTIVE', 'PAUSED']
 
-            while True:
-                choice = input("Choice (1-5): " if self.language == 'en' else "Choix (1-5): ").strip()
-                if choice == '1':
-                    self.job_statuses = ['ACTIVE']
-                    break
-                elif choice == '2':
-                    self.job_statuses = ['PAUSED']
-                    break
-                elif choice == '3':
-                    self.job_statuses = ['CLOSED']
-                    break
-                elif choice == '4':
-                    self.job_statuses = ['ACTIVE', 'PAUSED']
-                    break
-                elif choice == '5':
-                    self.job_statuses = ['ACTIVE', 'PAUSED', 'CLOSED']
-                    break
-                print("❌ Invalid choice" if self.language == 'en' else "❌ Choix invalide")
+        if auto:
+            print(f"[AUTO] Lang={self.language} Mode={self.mode} JobMode={self.job_mode}" + (f" Status={self.job_statuses}" if self.job_mode == 'all' else ""))
+            print("=" * 60)
+            print()
+            return
 
         print()
         print("=" * 60)
