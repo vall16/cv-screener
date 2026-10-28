@@ -1,7 +1,7 @@
 ---
 description: Recruiter: legge i CV in una cartella e produce valutazioni e classifica motivata
 mode: primary
-model: opencode/big-pickle
+model: ollama/qwen2.5:14b
 permission:
   bash: allow
   edit: allow
@@ -59,3 +59,4 @@ Scrivi `<cartella_output>/classifica.md` contenente:
 - Se un file non è leggibile (es. DOCX non supportato), annotalo in classifica.md e continua.
 - Puoi usare websearch/webfetch solo per arricchire la valutazione (es. verificare l'azienda del candidato), senza mai sostituire i fatti del CV.
 - Se una cartella con N file è troppo grande, lavora per gruppi e poi sintetizza.
+- NON lasciare file temporanei: se per leggere un PDF devi estrarre il testo in un file .txt temporaneo, cancellalo subito dopo averlo letto (es. `del`/`rm`). Alla fine dello screening non devono restare file .txt o cartelle temporanee (es. `.qwen/tmp/cvtext/`) nella cartella di lavoro.

@@ -24,7 +24,7 @@ _profiles: dict[str, dict] = {}
 _shortlist: dict[str, dict[str, str]] = {}  # {session_id: {filename: status}}
 _lock = threading.Lock()
 _MAX_OUTPUT_LINES = 500
-_procs: dict[str, subprocess.Popen] = {}  # job_id -> processo opencode in corso
+_procs: dict[str, subprocess.Popen] = {}  # job_id -> processo qwen in corso
 
 
 def _atomic_write(path: Path, data: str) -> None:
@@ -592,6 +592,99 @@ def _find_opencode() -> list[str]:
     return [str(path)]
 
 
+def _find_qwen() -> list[str]:
+    """Ritorna la lista di comando per lanciare Qwen Code (gestisce gli shim npm su Windows)."""
+    exe = shutil.which("qwen")
+    if not exe:
+        raise FileNotFoundError(
+            "qwen (Qwen Code) non trovato nel PATH. Installalo (npm i -g @qwen-code/qwen-code) e riprova."
+        )
+    path = Path(exe)
+    if path.suffix.lower() in (".cmd", ".bat"):
+        # Shim npm Windows: lancia direttamente `node cli-entry.js` per evitare il
+        # quoting di cmd.exe con prompt lunghi.
+        entry = path.parent / "node_modules" / "@qwen-code" / "qwen-code" / "cli-entry.js"
+        if entry.is_file():
+            return ["node", str(entry)]
+        return ["cmd", "/c", str(path)]
+    return [str(path)]
+
+
+def _recruiter_instructions() -> str:
+    """Corpo delle istruzioni del recruiter (da .opencode/agent/hr-recruiter.md, senza frontmatter)."""
+    agent_file = BASE_DIR / ".opencode" / "agent" / "hr-recruiter.md"
+    try:
+        text = agent_file.read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    if text.lstrip().startswith("---"):
+        parts = text.split("---", 2)
+        if len(parts) >= 3:
+            return parts[2].strip()
+    return text.strip()
+
+
+def _candidate_name(cv_name: str) -> str:
+    """Nome candidato dal nome file CV, senza suffisso <YYYYMMDD>_<HHMMSS> (case preservata)."""
+    m = re.match(r"^(.*)_\d{8}_\d{6}\.\w+$", cv_name, re.IGNORECASE)
+    return (m.group(1) if m else Path(cv_name).stem).strip()
+
+
+def _is_cancelled(job_id: str) -> bool:
+    with _lock:
+        job = _jobs.get(job_id)
+        return job is None or job["status"] != "running"
+
+
+def _run_qwen_once(job_id: str, prompt: str, timeout: int) -> tuple[bool, str | None]:
+    """Lancia una singola sessione qwen headless e streama l'output nel job."""
+    cmd = _find_qwen() + ["--yolo", "-o", "text", prompt]
+    env = os.environ.copy()
+    env["QWEN_CODE_SUPPRESS_YOLO_WARNING"] = "1"
+    proc = subprocess.Popen(
+        cmd,
+        cwd=str(BASE_DIR),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        env=env,
+    )
+    _procs[job_id] = proc
+    try:
+        assert proc.stdout is not None
+        for line in proc.stdout:
+            _append_output(_jobs[job_id], line.rstrip("\n"))
+        proc.wait(timeout=timeout)
+        if proc.returncode == 0:
+            return True, None
+        return False, f"qwen uscito con codice {proc.returncode}"
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait()
+        return False, f"Timeout: qwen non ha terminato entro {timeout // 60} min"
+    except Exception as exc:  # noqa: BLE001
+        return False, str(exc)
+    finally:
+        _procs.pop(job_id, None)
+
+
+def _run_qwen_with_retry(
+    job_id: str, prompt: str, attempts: int, timeout: int
+) -> tuple[bool, str | None]:
+    error: str | None = None
+    for attempt in range(1, attempts + 1):
+        if _is_cancelled(job_id):
+            return False, "annullato"
+        if attempt > 1:
+            _append_output(_jobs[job_id], f"\n[retry {attempt}/{attempts}] qwen fallito, rilancio…\n")
+        ok, error = _run_qwen_once(job_id, prompt, timeout)
+        if ok:
+            return True, None
+    return False, error
+
+
 def _run(
     job_id: str,
     profile: str,
@@ -599,81 +692,65 @@ def _run(
     session_id: str | None = None,
     cv_names: list[str] | None = None,
 ) -> None:
+    """Screening a sessioni singole: una sessione qwen per CV, poi una finale per la classifica."""
     report_dir = _report_dir_for(session_id)
     report_dir.mkdir(parents=True, exist_ok=True)
-    if session_id and cv_names:
-        cv_list = "\n".join(f"- {cv_dir / c}" for c in cv_names)
-        prompt = (
-            f"Analizza SOLO i CV elencati qui sotto (ignora qualsiasi altro file). "
+    if not cv_names:
+        cv_names = sorted(
+            p.name
+            for p in cv_dir.iterdir()
+            if p.is_file() and p.suffix.lower() in (".pdf", ".txt", ".docx")
+        )
+    if not cv_names:
+        _finish(job_id, "error", "Nessun CV trovato nella cartella")
+        return
+    instructions = _recruiter_instructions()
+    total = len(cv_names)
+    failed: list[str] = []
+    for idx, cv in enumerate(cv_names, start=1):
+        if _is_cancelled(job_id):
+            return
+        candidate = _candidate_name(cv)
+        report_name = f"{idx:02d}-{candidate}.md"
+        _append_output(_jobs[job_id], f"\n[{idx}/{total}] {cv} — avvio analisi…\n")
+        task = (
+            f"Analizza il CV: {cv_dir / cv}\n"
             f"Profilo target: '{profile}'.\n\n"
-            f"CV da analizzare:\n{cv_list}\n\n"
-            f"Esegui la procedura completa: per ogni CV scrivi un report singolo "
-            f"(<Numero>-<NomeCandidato>.md), poi scrivi classifica.md con tabella comparativa e top-3.\n"
-            f"Scrivi TUTTI i file (report e classifica.md) ESCLUSIVAMENTE nella cartella: {report_dir}\n"
-            f"Non scrivere nulla nella cartella _report principale."
+            f"Esegui la procedura completa di screening per questo singolo CV e scrivi il report "
+            f"ESCLUSIVAMENTE nel file: {report_dir / report_name}\n"
+            f"Non scrivere altri file: niente classifica.md, niente altre cartelle."
         )
+        prompt = f"{instructions}\n\n{task}" if instructions else task
+        ok, err = _run_qwen_with_retry(job_id, prompt, attempts=2, timeout=3600)
+        if _is_cancelled(job_id):
+            return
+        if ok:
+            _append_output(_jobs[job_id], f"[{idx}/{total}] {cv} — report scritto ({report_name})\n")
+        else:
+            failed.append(cv)
+            _append_output(_jobs[job_id], f"[{idx}/{total}] {cv} — ERRORE: {err}\n")
+    if _is_cancelled(job_id):
+        return
+    _append_output(_jobs[job_id], f"\n[{total + 1}/{total + 1}] Generazione classifica.md…\n")
+    task = (
+        f"Leggi tutti i report .md nella cartella {report_dir} (ignora classifica.md se esiste) "
+        f"e scrivi {report_dir / 'classifica.md'} con tabella comparativa completa, top-3 motivata "
+        f"e lista degli scartati con motivo.\n"
+        f"Profilo target: '{profile}'.\n"
+        f"Non riscrivere i report singoli."
+    )
+    prompt = f"{instructions}\n\n{task}" if instructions else task
+    ok, err = _run_qwen_with_retry(job_id, prompt, attempts=2, timeout=3600)
+    if _is_cancelled(job_id):
+        return
+    if ok:
+        _finish(job_id, "done")
     else:
-        prompt = (
-            f"Analizza i CV contenuti nella cartella {cv_dir} per il profilo target: "
-            f"'{profile}'. Esegui la procedura completa: per ogni CV scrivi un report "
-            f"singolo, poi scrivi classifica.md con tabella comparativa e top-3. "
-            f"Scrivi tutto nella cartella {report_dir}."
-        )
-    cmd = _find_opencode() + [
-        "run",
-        "--agent", "hr-recruiter",
-        prompt,
-        "--auto",
-        "--format", "default",
-    ]
-    env = os.environ.copy()
-    max_attempts = 3
-    status = "error"
-    error: str | None = None
-    for attempt in range(1, max_attempts + 1):
-        if attempt > 1:
-            _append_output(_jobs[job_id], f"\n[retry {attempt}/{max_attempts}] opencode fallito, rilancio…\n")
-        try:
-            proc = subprocess.Popen(
-                cmd,
-                cwd=str(BASE_DIR),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                env=env,
-            )
-            _procs[job_id] = proc
-            assert proc.stdout is not None
-            for line in proc.stdout:
-                _append_output(_jobs[job_id], line.rstrip("\n"))
-            try:
-                proc.wait(timeout=3600)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-                proc.wait()
-                raise
-            if proc.returncode == 0:
-                status = "done"
-                error = None
-                break
-            error = f"opencode uscito con codice {proc.returncode}"
-        except subprocess.TimeoutExpired:
-            status = "error"
-            error = "Timeout: opencode non ha terminato entro 1 ora"
-            break
-        except Exception as exc:  # noqa: BLE001
-            status = "error"
-            error = str(exc)
-            break  # timeout o eccezione grave: no retry
-        finally:
-            _procs.pop(job_id, None)
-    _finish(job_id, status, error)
+        _finish(job_id, "error", f"Classifica non generata: {err}")
 
 
 def cancel_job(job_id: str) -> bool:
-    """Uccide il processo opencode del job e lo marca come 'cancelled'."""
+    """Uccide il processo qwen del job e lo marca come 'cancelled'."""
     with _lock:
         job = _jobs.get(job_id)
         if job is None or job["status"] != "running":

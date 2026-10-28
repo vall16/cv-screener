@@ -60,7 +60,12 @@
       "Bash(head *)",
       "Bash(find *)",
       "Bash(cmd *)",
-      "Bash(build-cv-screener-portable.bat)"
+      "Bash(build-cv-screener-portable.bat)",
+      "Read(C:\\Users\\vallo\\AppData\\Roaming\\npm\\node_modules\\opencode-ai/**)",
+      "WebFetch(opencode.ai)",
+      "Bash(qwen *)",
+      "Bash(node *)",
+      "Bash(git *)"
     ]
   },
   "$version": 4

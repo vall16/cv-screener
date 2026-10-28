@@ -2,6 +2,9 @@
 .opencode/node_modules/
 .opencode/package-lock.json
 
+# ── qwen: temp con report di screening (dati personali) ──
+.qwen/tmp/
+
 # ── Python / backend ────────────────────────────────────
 __pycache__/
 *.py[cod]
