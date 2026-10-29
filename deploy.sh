@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 #
 # deploy.sh — deploy automatico di cv-screener su server Linux (/home/wvallone)
-# Esegue i passi 3-4 di DEPLOY.md: setup (backend + frontend) e avvio via systemd.
+# Esegue i passi di DEPLOY.md: setup (backend + frontend) e avvio via systemd.
+# Il servizio gira come utente dedicato (non root).
 #
 # Uso (sul server, come root):
 #   1) Copia la cartella cv-screener in /home/wvallone (WinSCP / scp)
@@ -14,6 +15,7 @@ APP_DIR="/home/wvallone/cv-screener"
 PORT=8000
 SERVICE="cv-screener"
 SERVICE_FILE="/etc/systemd/system/${SERVICE}.service"
+SERVICE_USER="cvscreener"
 
 # ---------------- Helper ----------------
 log()  { printf '\n\033[1;32m==>\033[0m %s\n' "$*"; }
@@ -44,7 +46,21 @@ cd "$APP_DIR/frontend"
 npm install
 npm run build
 
-# ---------------- 4. Servizio systemd ----------------
+# ---------------- 4. Utente dedicato ----------------
+log "Preparo utente dedicato: $SERVICE_USER"
+if ! id -u "$SERVICE_USER" >/dev/null 2>&1; then
+  useradd -r -m -d "/home/$SERVICE_USER" -s /usr/sbin/nologin "$SERVICE_USER"
+  log "Creato utente $SERVICE_USER"
+fi
+# L'utente deve poter attraversare la cartella padre e possedere l'app (venv, node_modules, CVs)
+chmod 755 "$(dirname "$APP_DIR")"
+chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR"
+# Cartella config di Qwen Code per l'utente dedicato (metti qui settings.json)
+mkdir -p "/home/$SERVICE_USER/.qwen"
+chown "$SERVICE_USER:$SERVICE_USER" "/home/$SERVICE_USER/.qwen"
+log "Config Qwen Code: /home/$SERVICE_USER/.qwen/settings.json"
+
+# ---------------- 5. Servizio systemd ----------------
 log "Creazione servizio systemd: $SERVICE"
 cat > "$SERVICE_FILE" <<EOF
 [Unit]
@@ -55,7 +71,7 @@ After=network.target
 WorkingDirectory=${APP_DIR}/backend
 ExecStart=${APP_DIR}/backend/.venv/bin/uvicorn main:app --host 0.0.0.0 --port ${PORT}
 Restart=always
-User=root
+User=${SERVICE_USER}
 
 [Install]
 WantedBy=multi-user.target
@@ -65,7 +81,7 @@ systemctl daemon-reload
 systemctl enable "$SERVICE"
 systemctl restart "$SERVICE"
 
-# ---------------- 5. Stato ----------------
+# ---------------- 6. Stato ----------------
 sleep 2
 systemctl --no-pager status "$SERVICE" || true
 IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
