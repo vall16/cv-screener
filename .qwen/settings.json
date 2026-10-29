@@ -65,7 +65,12 @@
       "WebFetch(opencode.ai)",
       "Bash(qwen *)",
       "Bash(node *)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "Bash(\"c:\\program files\\git\\bin\\bash.exe\" *)",
+      "Bash(\"c:\\users\\vallo\\appdata\\local\\programs\\git\\bin\\bash.exe\" *)",
+      "Bash(then *)",
+      "Bash(else *)",
+      "Bash(fi)"
     ]
   },
   "$version": 4
