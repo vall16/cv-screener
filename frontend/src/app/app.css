@@ -721,6 +721,37 @@ ul.cvs li {
   padding: 1px 0;
 }
 
+.timing {
+  margin-top: 12px;
+  font-size: 13px;
+}
+
+.timing summary {
+  cursor: pointer;
+  color: var(--muted);
+  user-select: none;
+}
+
+.timing-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.timing-table th,
+.timing-table td {
+  text-align: left;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.timing-table th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
 .results {
   display: grid;
   grid-template-columns: 280px 1fr;

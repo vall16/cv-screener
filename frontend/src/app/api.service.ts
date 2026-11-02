@@ -21,18 +21,32 @@ export interface UploadResult {
 
 export type JobStatus = 'running' | 'done' | 'error' | 'cancelled' | 'interrupted';
 
+export interface CandidateTiming {
+  cv: string;
+  name: string;
+  report: string | null;
+  started: string;
+  finished: string;
+  duration_seconds: number;
+  status: 'done' | 'error' | 'cancelled';
+  error: string | null;
+}
+
 export interface Job {
   id: string;
   status: JobStatus;
   profile: string;
   cv_dir: string;
   session_id: string | null;
+  mode?: 'all' | 'new' | 'failed';
   cvs: string[];
   output: string[];
   error: string | null;
   reports: string[];
+  candidates?: CandidateTiming[];
   started: string;
   finished: string | null;
+  duration_seconds?: number | null;
 }
 
 export interface JobResult {
@@ -146,10 +160,16 @@ export class ApiService {
     return this.http.get<JobList>(`${this.base}/api/jobs`);
   }
 
-  startJob(profile: string, sessionId?: string, cvs?: string[]): Observable<JobResult> {
-    const body: { profile: string; session_id?: string; cvs?: string[] } = { profile };
+  startJob(
+    profile: string,
+    sessionId?: string,
+    cvs?: string[],
+    mode: 'all' | 'new' | 'failed' = 'all',
+  ): Observable<JobResult> {
+    const body: { profile: string; session_id?: string; cvs?: string[]; mode?: string } = { profile };
     if (sessionId) body.session_id = sessionId;
     if (cvs) body.cvs = cvs;
+    if (mode !== 'all') body.mode = mode;
     return this.http.post<JobResult>(`${this.base}/api/jobs`, body);
   }
 

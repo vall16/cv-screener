@@ -1,4 +1,5 @@
 """API FastAPI del progetto cv-screener."""
+import csv
 import hashlib
 import io
 import json
@@ -230,6 +231,7 @@ class ScreeningReq(BaseModel):
     profile: str
     session_id: str | None = None
     cvs: list[str] | None = None
+    mode: str = "all"
 
 
 class CreateSessionReq(BaseModel):
@@ -247,21 +249,26 @@ def api_list_jobs():
 def api_start_job(req: ScreeningReq):
     if not req.profile or not req.profile.strip():
         raise HTTPException(status_code=422, detail="Inserisci il profilo target")
-    if req.session_id:
-        session = screener.get_session(req.session_id)
-        if session is None:
-            raise HTTPException(status_code=404, detail="Posizione non trovata")
-        cvs = req.cvs if req.cvs else session.get("cvs", [])
-        if not cvs:
-            raise HTTPException(status_code=422, detail="La posizione non ha CV selezionati")
-        try:
-            job = screener.start_job(req.profile.strip(), session_id=req.session_id, cv_names=cvs)
-        except FileNotFoundError as e:
-            raise HTTPException(status_code=422, detail=str(e))
-    else:
-        if not screener.list_cvs():
-            raise HTTPException(status_code=422, detail="Nessun CV presente nella cartella CVs")
-        job = screener.start_job(req.profile.strip())
+    try:
+        if req.session_id:
+            session = screener.get_session(req.session_id)
+            if session is None:
+                raise HTTPException(status_code=404, detail="Posizione non trovata")
+            cvs = req.cvs if req.cvs else session.get("cvs", [])
+            if not cvs:
+                raise HTTPException(status_code=422, detail="La posizione non ha CV selezionati")
+            job = screener.start_job(
+                req.profile.strip(),
+                session_id=req.session_id,
+                cv_names=cvs,
+                mode=req.mode,
+            )
+        else:
+            if not screener.list_cvs():
+                raise HTTPException(status_code=422, detail="Nessun CV presente nella cartella CVs")
+            job = screener.start_job(req.profile.strip(), mode=req.mode)
+    except (FileNotFoundError, ValueError) as e:
+        raise HTTPException(status_code=422, detail=str(e))
     return {"job": job}
 
 
@@ -321,21 +328,29 @@ def api_reports_summary(session: str | None = None):
     return {"candidates": screener.get_candidates_summary(session)}
 
 
-@app.get("/api/reports/summary/csv")
-def api_reports_csv(session: str | None = None):
-    """Esporta la classifica in CSV."""
-    import csv
-    import io as _io
-
-    candidates = screener.get_candidates_summary(session)
-    buf = _io.StringIO()
+def _summary_csv_bytes(candidates: list[dict]) -> bytes:
+    """CSV della classifica con BOM UTF-8 (Excel apre correttamente gli accenti)."""
+    buf = io.StringIO()
     writer = csv.writer(buf, delimiter=";")
     writer.writerow(["Nome", "Voto", "Giudizio", "Esperienza", "Fit tecnico"])
     for c in candidates:
-        writer.writerow([c["name"], c.get("score", ""), c.get("verdict", ""), c.get("experience", ""), c.get("fit", "")])
-    buf.seek(0)
+        score = c.get("score")
+        writer.writerow([
+            c.get("name") or "",
+            "" if score is None else score,
+            c.get("giudizio") or "",
+            c.get("esperienza") or "",
+            c.get("fit") or "",
+        ])
+    return ("\ufeff" + buf.getvalue()).encode("utf-8")
+
+
+@app.get("/api/reports/summary/csv")
+def api_reports_csv(session: str | None = None):
+    """Esporta la classifica in CSV."""
+    candidates = screener.get_candidates_summary(session)
     return StreamingResponse(
-        iter([buf.getvalue()]),
+        iter([_summary_csv_bytes(candidates)]),
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": 'attachment; filename="classifica.csv"'},
     )

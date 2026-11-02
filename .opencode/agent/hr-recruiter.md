@@ -47,6 +47,34 @@ Sei un recruiter esperto, metodico e obiettivo. Ricevi una cartella con N CV (PD
 - **Motivazione:** 2-4 righe con riferimenti alle sezioni del CV (es. "Sezione 'Esperienza', 2021-2024").
 ```
 
+## Sidecar JSON (obbligatorio)
+Accanto a OGNI report `<Numero>-<NomeCandidato>.md` scrivi un file con lo STESSO nome e
+estensione `.json` (es. `01-Marco-Rossi.md` → `01-Marco-Rossi.json`), in UTF-8, con QUESTO
+schema esatto:
+
+```json
+{
+  "name": "nome e cognome del candidato",
+  "score": 72,
+  "giudizio": "Sì passa",
+  "esperienza": "8 anni",
+  "fit": "Alto",
+  "email": "marco.rossi@esempio.it",
+  "telefono": "+39 333 0000000",
+  "skills": ["python", "fastapi"],
+  "red_flags": ["gap 2023-2024 non spiegato"],
+  "motivazione": "2-4 righe coerenti con il report .md"
+}
+```
+
+Regole per il JSON:
+- `score`: intero 0-100, uguale al "Voto complessivo" del report; se non lo assegni, `null`.
+- `giudizio`: esattamente uno dei tre valori `"Sì passa"`, `"Da valutare"`, `"No"`.
+- `email` / `telefono`: `null` se non presenti nel CV (NON inventarli).
+- `skills` / `red_flags`: array di stringhe (anche vuoto `[]`).
+- I valori devono essere coerenti con il report `.md` corrispondente.
+- Il JSON è un file permanente (non temporaneo): va lasciato in cartella.
+
 ## Output finale
 Scrivi `<cartella_output>/classifica.md` contenente:
 - tabella comparativa (Nome | Esperienza | Fit | Voto | Giudizio);

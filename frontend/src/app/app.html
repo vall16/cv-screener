@@ -214,10 +214,27 @@
                 <span class="file">{{ s.name }}</span>
                 <span class="muted">{{ s.profile }}</span>
                 <span class="muted">{{ s.cvs.length }} CV</span>
+                <span class="muted">Creata il {{ formatDateTime(s.created_at) }}</span>
               </div>
               <div class="row">
                 <button class="primary" (click)="startSessionScreening(s)" [disabled]="job?.status === 'running'">
                   Avvia screening
+                </button>
+                <button
+                  class="ghost"
+                  (click)="startSessionScreening(s, 'new')"
+                  [disabled]="job?.status === 'running'"
+                  title="Analizza solo i CV che non hanno ancora un report"
+                >
+                  Solo nuovi
+                </button>
+                <button
+                  class="ghost"
+                  (click)="startSessionScreening(s, 'failed')"
+                  [disabled]="job?.status === 'running'"
+                  title="Riprendi i CV mancanti o falliti"
+                >
+                  Riprendi
                 </button>
                 <button class="ghost danger" (click)="deleteSession(s)">Elimina</button>
               </div>
@@ -236,8 +253,22 @@
             </span>
             <span class="muted">#{{ job.id }}</span>
             <span class="muted">{{ job.profile }}</span>
+            <span class="muted">Inizio: {{ formatDateTime(job.started) }}</span>
+            @if (job.finished) {
+              <span class="muted">Fine: {{ formatDateTime(job.finished) }}</span>
+            }
+            @if (job.duration_seconds != null) {
+              <span class="muted">Durata: {{ formatDuration(job.duration_seconds) }}</span>
+            }
+            @if (modeLabel(job.mode)) {
+              <span class="muted">{{ modeLabel(job.mode) }}</span>
+            }
             @if (job.status === 'running') {
               <button class="danger" (click)="cancelJob()" style="margin-left:auto">■ Stop</button>
+            } @else if (canResume(job)) {
+              <button class="primary" (click)="resumeJob(job)" style="margin-left:auto">
+                {{ job.status === 'interrupted' ? 'Riprendi' : 'Riprova falliti' }}
+              </button>
             }
           </div>
 
@@ -253,6 +284,28 @@
               <div class="log-line">{{ line }}</div>
             }
           </div>
+
+          @if (job.candidates?.length) {
+            <details class="timing">
+              <summary>Tempi per candidato ({{ job.candidates!.length }})</summary>
+              <table class="timing-table">
+                <thead>
+                  <tr><th>Candidato</th><th>Inizio</th><th>Fine</th><th>Durata</th><th>Esito</th></tr>
+                </thead>
+                <tbody>
+                  @for (c of job.candidates!; track c.cv) {
+                    <tr>
+                      <td>{{ c.name }}</td>
+                      <td class="muted">{{ formatDateTime(c.started) }}</td>
+                      <td class="muted">{{ formatDateTime(c.finished) }}</td>
+                      <td>{{ formatDuration(c.duration_seconds) }}</td>
+                      <td>{{ c.status === 'done' ? 'OK' : c.status === 'cancelled' ? 'Annullato' : 'Errore' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </details>
+          }
 
           @if (job.status === 'done') {
             <div class="row end">
@@ -276,8 +329,17 @@
           @for (j of history.slice(1); track j.id) {
             <li>
               <span class="file">{{ j.profile }}</span>
+              <span class="muted">{{ formatDateTime(j.started) }}</span>
+              @if (j.duration_seconds != null) {
+                <span class="muted">{{ formatDuration(j.duration_seconds) }}</span>
+              }
               <span class="pill" [class]="j.status">{{ statusLabel(j) }}</span>
               <button class="ghost" (click)="openJob(j)">apri</button>
+              @if (j.status !== 'running' && canResume(j)) {
+                <button class="ghost" (click)="resumeJob(j)">
+                  {{ j.status === 'interrupted' ? 'riprendi' : 'riprova falliti' }}
+                </button>
+              }
               <button class="ghost danger" (click)="deleteJob(j)">elimina</button>
             </li>
           }

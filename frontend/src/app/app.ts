@@ -372,6 +372,31 @@ export class App implements OnInit, OnDestroy {
     return d.toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' });
   }
 
+  formatDateTime(iso: string | null | undefined): string {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleString('it-IT', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+  }
+
+  formatDuration(seconds: number | null | undefined): string {
+    if (seconds == null) return '—';
+    const total = Math.round(seconds);
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    if (h) return `${h} h ${m} min ${s} s`;
+    if (m) return `${m} min ${s} s`;
+    return `${s} s`;
+  }
+
   cvMetaLabel(name: string): string {
     const d = this.cvDetails[name];
     if (!d) return '';
@@ -477,23 +502,62 @@ export class App implements OnInit, OnDestroy {
     this.newSessionCvs = [];
   }
 
-  async startSessionScreening(s: Session): Promise<void> {
+  async startSessionScreening(
+    s: Session,
+    mode: 'all' | 'new' | 'failed' = 'all',
+  ): Promise<void> {
     if (!s.cvs.length) {
       this.showToast('La posizione non ha CV selezionati.', 'err');
       return;
     }
     this.job = null;
     try {
-      const r = await firstValueFrom(this.api.startJob(s.profile, s.id, s.cvs));
+      const r = await firstValueFrom(this.api.startJob(s.profile, s.id, s.cvs, mode));
       this.job = r.job;
       this.step = 'run';
       this.startPolling();
-      this.showToast('Screening avviato.', 'ok');
+      this.showToast(
+        mode === 'new' ? 'Screening dei nuovi CV avviato.'
+          : mode === 'failed' ? 'Ripresa dei CV non completati avviata.'
+          : 'Screening avviato.',
+        'ok',
+      );
       await this.loadJobs();
     } catch (e: unknown) {
       const err = e as { error?: { detail?: string } };
       this.showToast(err?.error?.detail ?? 'Impossibile avviare lo screening.', 'err');
     }
+  }
+
+  async resumeJob(j: Job): Promise<void> {
+    const cvs = j.session_id ? undefined : (j.cvs.length ? j.cvs : undefined);
+    try {
+      const r = await firstValueFrom(
+        this.api.startJob(j.profile, j.session_id || undefined, cvs, 'failed'),
+      );
+      this.job = r.job;
+      this.step = 'run';
+      this.startPolling();
+      this.showToast('Ripresa avviata: analizzo solo i CV mancanti o falliti.', 'ok');
+      await this.loadJobs();
+    } catch (e: unknown) {
+      const err = e as { error?: { detail?: string } };
+      this.showToast(err?.error?.detail ?? 'Impossibile riprendere lo screening.', 'err');
+    }
+  }
+
+  hasFailed(j: Job): boolean {
+    return (j.candidates ?? []).some((c) => c.status === 'error' || c.status === 'cancelled');
+  }
+
+  canResume(j: Job): boolean {
+    return j.status === 'interrupted' || j.status === 'error' || this.hasFailed(j);
+  }
+
+  modeLabel(mode: string | undefined): string {
+    if (mode === 'new') return 'Solo nuovi';
+    if (mode === 'failed') return 'Ripresa';
+    return '';
   }
 
   async switchSession(sessionId: string): Promise<void> {
