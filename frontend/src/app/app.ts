@@ -511,6 +511,7 @@ export class App implements OnInit, OnDestroy {
       return;
     }
     this.job = null;
+    this.requestNotificationPermission();
     try {
       const r = await firstValueFrom(this.api.startJob(s.profile, s.id, s.cvs, mode));
       this.job = r.job;
@@ -1184,15 +1185,29 @@ export class App implements OnInit, OnDestroy {
 
   // --- Notifica browser ---
 
+  private requestNotificationPermission(): void {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }
+
   private notifyJobComplete(job: Job): void {
     if (!('Notification' in window)) return;
-    if (Notification.permission === 'default') {
-      Notification.requestPermission();
-      return;
-    }
-    if (Notification.permission === 'granted') {
-      const label = job.status === 'done' ? '✓ Completato' : '✗ Errore';
-      new Notification('CV Screener', { body: `Screening ${label}` });
-    }
+    if (Notification.permission !== 'granted') return;
+    const label = job.status === 'done' ? '✓ Completato' : '✗ Errore';
+    const count = job.candidates?.length ?? job.cvs.length;
+    new Notification('CV Screener', { body: `Screening ${label} (${count} CV)` });
+  }
+
+  estimatedRemaining(): string {
+    if (!this.job || this.job.status !== 'running') return '';
+    const total = this.job.cvs.length;
+    if (!total) return '';
+    const done = (this.job.candidates ?? []).filter((c) => c.status === 'done' || c.status === 'error');
+    if (!done.length) return 'Calcolo in corso…';
+    const avgSec = done.reduce((sum, c) => sum + (c.duration_seconds || 0), 0) / done.length;
+    const remaining = total - done.length;
+    const estSec = Math.round(avgSec * remaining);
+    return `~${this.formatDuration(estSec)} rimanenti (${done.length}/${total})`;
   }
 }

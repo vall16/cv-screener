@@ -1809,3 +1809,9 @@ button.mini:disabled {
 .pipeline-col.stage-offer { border-top-color: #059669; }
 .pipeline-col.stage-hired { border-top-color: #10b981; }
 .pipeline-col.stage-rejected { border-top-color: #ef4444; }
+
+.eta {
+  font-weight: 600;
+  color: var(--accent, #3b82f6);
+  margin-left: 12px;
+}

@@ -264,6 +264,9 @@
               <span class="muted">{{ modeLabel(job.mode) }}</span>
             }
             @if (job.status === 'running') {
+              @if (estimatedRemaining()) {
+                <span class="muted eta">{{ estimatedRemaining() }}</span>
+              }
               <button class="danger" (click)="cancelJob()" style="margin-left:auto">■ Stop</button>
             } @else if (canResume(job)) {
               <button class="primary" (click)="resumeJob(job)" style="margin-left:auto">
