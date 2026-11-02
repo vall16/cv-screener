@@ -54,7 +54,8 @@ if ! id -u "$SERVICE_USER" >/dev/null 2>&1; then
 fi
 # L'utente deve poter attraversare la cartella padre e possedere l'app (venv, node_modules, CVs)
 chmod 755 "$(dirname "$APP_DIR")"
-chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR"
+chown -R "$SERVICE_USER:wvallone" "$APP_DIR"
+chmod -R g+rw "$APP_DIR"
 # Cartella config di Qwen Code per l'utente dedicato (metti qui settings.json)
 mkdir -p "/home/$SERVICE_USER/.qwen"
 chown "$SERVICE_USER:$SERVICE_USER" "/home/$SERVICE_USER/.qwen"
