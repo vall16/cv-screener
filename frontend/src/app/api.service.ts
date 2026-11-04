@@ -177,6 +177,13 @@ export class ApiService {
     return this.http.get<JobResult>(`${this.base}/api/jobs/${id}`);
   }
 
+  retryCandidate(report: string, sessionId?: string): Observable<JobResult> {
+    return this.http.post<JobResult>(`${this.base}/api/jobs/retry`, {
+      report,
+      session_id: sessionId || undefined,
+    });
+  }
+
   cancelJob(id: string): Observable<{ ok: boolean }> {
     return this.http.post<{ ok: boolean }>(`${this.base}/api/jobs/${id}/cancel`, null);
   }

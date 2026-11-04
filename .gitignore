@@ -4,6 +4,8 @@
 
 # ── qwen: temp con report di screening (dati personali) ──
 .qwen/tmp/
+# config locale (permessi/modello machine-specific): non tracciata
+.qwen/settings.json
 
 # ── Python / backend ────────────────────────────────────
 __pycache__/

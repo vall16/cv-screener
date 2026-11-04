@@ -524,7 +524,7 @@ def _write_classifica(
 def list_cvs(cv_dir: Path | None = None) -> list[str]:
     folder = Path(cv_dir) if cv_dir else DEFAULT_CV_DIR
     folder.mkdir(parents=True, exist_ok=True)
-    allowed = (".pdf", ".txt")
+    allowed = (".pdf", ".txt", ".docx")
     return sorted(
         p.name for p in folder.iterdir()
         if p.is_file() and p.suffix.lower() in allowed
@@ -535,7 +535,7 @@ def list_cv_details(cv_dir: Path | None = None) -> list[dict]:
     """Metadati dei CV (nome, dimensione in byte, data modifica ISO) per la UI."""
     folder = Path(cv_dir) if cv_dir else DEFAULT_CV_DIR
     folder.mkdir(parents=True, exist_ok=True)
-    allowed = (".pdf", ".txt")
+    allowed = (".pdf", ".txt", ".docx")
     details = []
     for p in sorted(folder.iterdir()):
         if not (p.is_file() and p.suffix.lower() in allowed):
@@ -562,7 +562,7 @@ def delete_cv(name: str, cv_dir: Path | None = None) -> bool:
         return False
     folder = Path(cv_dir) if cv_dir else DEFAULT_CV_DIR
     target = folder / safe
-    if target.is_file() and target.suffix.lower() in (".pdf", ".txt"):
+    if target.is_file() and target.suffix.lower() in (".pdf", ".txt", ".docx"):
         target.unlink(missing_ok=True)
         return True
     return False
@@ -1279,6 +1279,164 @@ def _run_qwen_with_retry(
     return False, error
 
 
+def _screening_mode() -> str:
+    """Modalità di screening: 'agent' (default, qwen headless) o 'direct' (chiamata API)."""
+    return os.environ.get("SCREENING_MODE", "agent").strip().lower()
+
+
+def _direct_config() -> dict:
+    """Configurazione del percorso direct (endpoint OpenAI-compatible), da env var."""
+    return {
+        "base": os.environ.get("SCREENING_API_BASE", "http://192.168.1.145:11434/v1"),
+        "model": os.environ.get("SCREENING_MODEL", "qwen3.8-27b"),
+        "api_key": os.environ.get("SCREENING_API_KEY", ""),
+        "max_tokens": int(os.environ.get("SCREENING_MAX_TOKENS", "8192")),
+        "temperature": float(os.environ.get("SCREENING_TEMPERATURE", "0.2")),
+        "timeout": int(os.environ.get("SCREENING_TIMEOUT", "1800")),
+    }
+
+
+def _extract_cv_text(path: Path) -> str:
+    """Estrae il testo da un CV (PDF/DOCX/TXT) per il percorso direct."""
+    suffix = path.suffix.lower()
+    if suffix == ".pdf":
+        import pypdf
+        reader = pypdf.PdfReader(str(path))
+        return "\n".join((page.extract_text() or "") for page in reader.pages)
+    if suffix == ".docx":
+        import docx
+        d = docx.Document(str(path))
+        parts = [p.text for p in d.paragraphs]
+        for table in d.tables:
+            for row in table.rows:
+                parts.append(" | ".join(cell.text for cell in row.cells))
+        return "\n".join(parts)
+    return path.read_text(encoding="utf-8", errors="replace")
+
+
+def _extract_json(text: str) -> dict | None:
+    """Estrae un oggetto JSON da una risposta del modello (tolera code fence e testo extra)."""
+    text = (text or "").strip()
+    if not text:
+        return None
+    if text.startswith("```"):
+        text = re.sub(r"^```[a-zA-Z]*\s*", "", text)
+        text = re.sub(r"\s*```$", "", text).strip()
+    try:
+        data = json.loads(text)
+        return data if isinstance(data, dict) else None
+    except json.JSONDecodeError:
+        pass
+    start, end = text.find("{"), text.rfind("}")
+    if start != -1 and end > start:
+        try:
+            data = json.loads(text[start:end + 1])
+            return data if isinstance(data, dict) else None
+        except json.JSONDecodeError:
+            return None
+    return None
+
+
+def _screen_cv_direct(
+    job_id: str,
+    profile: str,
+    cv_dir: Path,
+    report_dir: Path,
+    cv: str,
+    report_name: str,
+    json_name: str,
+    instructions: str,
+) -> tuple[bool, str | None]:
+    """Screening diretto: una sola chiamata chat/completions, senza agente qwen.
+
+    Stesso modello e stesse istruzioni del percorso agent, ma un'unica chiamata
+    (niente loop agentico, niente tool call, niente avvio processo per CV).
+    """
+    cfg = _direct_config()
+    try:
+        import requests
+    except ImportError:
+        return False, "libreria 'requests' non installata (necessaria per SCREENING_MODE=direct)"
+    try:
+        cv_text = _extract_cv_text(cv_dir / cv)
+    except Exception as exc:  # noqa: BLE001
+        return False, f"impossibile leggere il CV: {exc}"
+    if not cv_text.strip():
+        return False, "CV vuoto o non leggibile"
+    if len(cv_text) > 100000:
+        cv_text = cv_text[:100000]
+    user_msg = (
+        "Valuta il CV rispetto al profilo target. In questa modalità NON scrivere file: "
+        "rispondi ESCLUSIVAMENTE con un oggetto JSON valido (nessun testo fuori dal JSON, "
+        "nessun markdown, nessun code fence).\n"
+        "Il JSON deve contenere esattamente questi campi: "
+        "name, score, giudizio, esperienza, fit, email, telefono, skills, red_flags, "
+        "motivazione, report_markdown.\n"
+        "report_markdown è il report completo in markdown, con la struttura richiesta "
+        "nelle tue istruzioni. Segui le regole (non inventare dati, cita le sezioni del CV).\n\n"
+        f"Profilo target: '{profile}'\n\n"
+        "CV:\n"
+        f"{cv_text}"
+    )
+    headers = {"Content-Type": "application/json"}
+    if cfg["api_key"]:
+        headers["Authorization"] = f"Bearer {cfg['api_key']}"
+    payload = {
+        "model": cfg["model"],
+        "messages": [
+            {"role": "system", "content": instructions or "Sei un recruiter esperto e obiettivo."},
+            {"role": "user", "content": user_msg},
+        ],
+        "temperature": cfg["temperature"],
+        "max_tokens": cfg["max_tokens"],
+    }
+    content: str | None = None
+    last_err: str | None = None
+    for attempt in range(1, 3):
+        if _is_cancelled(job_id):
+            return False, "annullato"
+        with _lock:
+            if _jobs.get(job_id):
+                _jobs[job_id]["output"].append(
+                    f"[direct] {cv} — chiamata al modello {cfg['model']} (tentativo {attempt})…\n"
+                )
+                if len(_jobs[job_id]["output"]) > _MAX_OUTPUT_LINES:
+                    _jobs[job_id]["output"] = _jobs[job_id]["output"][-_MAX_OUTPUT_LINES:]
+        try:
+            resp = requests.post(
+                cfg["base"].rstrip("/") + "/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=cfg["timeout"],
+            )
+            resp.raise_for_status()
+            content = resp.json()["choices"][0]["message"]["content"]
+            last_err = None
+            break
+        except Exception as exc:  # noqa: BLE001
+            last_err = str(exc)
+    if last_err is not None:
+        return False, f"errore chiamata modello: {last_err}"
+    data = _extract_json(content or "")
+    if not data:
+        return False, "risposta del modello non è un JSON valido"
+    if data.get("score") is None and not _normalize_giudizio(data.get("giudizio")):
+        return False, "JSON senza score né giudizio"
+    report_md = str(data.get("report_markdown") or "").strip()
+    sidecar = {
+        k: data.get(k)
+        for k in ("name", "score", "giudizio", "esperienza", "fit",
+                  "email", "telefono", "skills", "red_flags", "motivazione")
+    }
+    try:
+        if report_md:
+            _atomic_write(report_dir / report_name, report_md)
+        _atomic_write(report_dir / json_name, json.dumps(sidecar, ensure_ascii=False, indent=2))
+    except OSError as exc:
+        return False, f"errore scrittura report: {exc}"
+    return True, None
+
+
 def _run_single_cv(
     job_id: str,
     profile: str,
@@ -1299,17 +1457,22 @@ def _run_single_cv(
             if len(_jobs[job_id]["output"]) > _MAX_OUTPUT_LINES:
                 _jobs[job_id]["output"] = _jobs[job_id]["output"][-_MAX_OUTPUT_LINES:]
     json_name = Path(report_name).with_suffix(".json").name
-    task = (
-        f"Analizza il CV: {cv_dir / cv}\n"
-        f"Profilo target: '{profile}'.\n\n"
-        f"Esegui la procedura completa di screening per questo singolo CV e scrivi il report "
-        f"nel file: {report_dir / report_name}\n"
-        f"Scrivi ANCHE il sidecar JSON strutturato nel file: {report_dir / json_name} "
-        f"(schema esatto nelle tue istruzioni).\n"
-        f"Non scrivere altri file: niente classifica.md, niente altre cartelle."
-    )
-    prompt = f"{instructions}\n\n{task}" if instructions else task
-    ok, err = _run_qwen_with_retry(job_id, prompt, attempts=2, timeout=3600)
+    if _screening_mode() == "direct":
+        ok, err = _screen_cv_direct(
+            job_id, profile, cv_dir, report_dir, cv, report_name, json_name, instructions
+        )
+    else:
+        task = (
+            f"Analizza il CV: {cv_dir / cv}\n"
+            f"Profilo target: '{profile}'.\n\n"
+            f"Esegui la procedura completa di screening per questo singolo CV e scrivi il report "
+            f"nel file: {report_dir / report_name}\n"
+            f"Scrivi ANCHE il sidecar JSON strutturato nel file: {report_dir / json_name} "
+            f"(schema esatto nelle tue istruzioni).\n"
+            f"Non scrivere altri file: niente classifica.md, niente altre cartelle."
+        )
+        prompt = f"{instructions}\n\n{task}" if instructions else task
+        ok, err = _run_qwen_with_retry(job_id, prompt, attempts=2, timeout=3600)
     if _is_cancelled(job_id):
         _record_candidate_timing(job_id, cv, None, started_ts, "cancelled", "annullato")
         return False, "annullato"

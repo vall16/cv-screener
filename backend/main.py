@@ -168,11 +168,13 @@ def api_get_cv_file(name: str):
     path = screener.DEFAULT_CV_DIR / safe
     if not path.is_file():
         raise HTTPException(status_code=404, detail="CV non trovato")
-    media_type = (
-        "application/pdf"
-        if path.suffix.lower() == ".pdf"
-        else "text/plain; charset=utf-8"
-    )
+    suffix = path.suffix.lower()
+    if suffix == ".pdf":
+        media_type = "application/pdf"
+    elif suffix == ".docx":
+        media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    else:
+        media_type = "text/plain; charset=utf-8"
     return FileResponse(path, media_type=media_type, filename=safe)
 
 
@@ -267,6 +269,49 @@ def api_start_job(req: ScreeningReq):
             if not screener.list_cvs():
                 raise HTTPException(status_code=422, detail="Nessun CV presente nella cartella CVs")
             job = screener.start_job(req.profile.strip(), mode=req.mode)
+    except (FileNotFoundError, ValueError) as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    return {"job": job}
+
+
+class RetryReq(BaseModel):
+    session_id: str | None = None
+    report: str
+
+
+def _find_session_for_report(report_name: str) -> str | None:
+    """Trova la sessione che contiene un report (per il retry senza sessione attiva)."""
+    base = screener.DEFAULT_CV_DIR / screener.REPORT_DIR_NAME
+    if base.is_dir():
+        for sid_dir in base.iterdir():
+            if sid_dir.is_dir() and (sid_dir / report_name).is_file():
+                return sid_dir.name
+    return None
+
+
+@app.post("/api/jobs/retry")
+def api_retry_candidate(req: RetryReq):
+    """Rianalizza un singolo candidato: risolve il CV dal nome report e avvia un job."""
+    safe = screener._safe_name(req.report)
+    if safe is None:
+        raise HTTPException(status_code=400, detail="Nome report non valido")
+    session_id = req.session_id or _find_session_for_report(safe)
+    cand_name = screener._nome_from_filename(safe)
+    cv_files = screener._resolve_cv_names([cand_name], screener.DEFAULT_CV_DIR)
+    if not cv_files:
+        raise HTTPException(status_code=404, detail=f"Nessun CV trovato per {cand_name}")
+    profile = ""
+    if session_id:
+        session = screener.get_session(session_id)
+        if session:
+            profile = session.get("profile", "")
+    try:
+        job = screener.start_job(
+            profile,
+            session_id=session_id,
+            cv_names=cv_files,
+            mode="all",
+        )
     except (FileNotFoundError, ValueError) as e:
         raise HTTPException(status_code=422, detail=str(e))
     return {"job": job}

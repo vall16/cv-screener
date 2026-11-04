@@ -403,6 +403,7 @@
                 <th>Giudizio</th>
                 <th>Stato</th>
                 <th>Esperienza</th>
+                <th class="cand-actions">Azioni</th>
               </tr>
             </thead>
             <tbody>
@@ -429,11 +430,19 @@
                     </select>
                   </td>
                   <td class="cand-exp" [title]="c.esperienza ?? ''">{{ c.esperienza ?? '—' }}</td>
+                  <td class="cand-actions" (click)="$event.stopPropagation()">
+                    <button
+                      class="ghost retry-btn"
+                      (click)="retryCandidate(c)"
+                      title="Rianalizza questo candidato"
+                      [disabled]="job?.status === 'running'"
+                    >↻</button>
+                  </td>
                 </tr>
               }
               @empty {
                 <tr>
-                  <td colspan="5" class="muted cand-empty">Nessun candidato corrisponde ai filtri.</td>
+                  <td colspan="6" class="muted cand-empty">Nessun candidato corrisponde ai filtri.</td>
                 </tr>
               }
             </tbody>

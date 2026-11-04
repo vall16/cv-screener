@@ -547,6 +547,28 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
+  async retryCandidate(c: Candidate): Promise<void> {
+    if (this.job?.status === 'running') {
+      this.showToast('C’è già uno screening in corso.', 'err');
+      return;
+    }
+    this.job = null;
+    this.requestNotificationPermission();
+    try {
+      const r = await firstValueFrom(
+        this.api.retryCandidate(c.file, this.activeSessionId || undefined),
+      );
+      this.job = r.job;
+      this.step = 'run';
+      this.startPolling();
+      this.showToast(`Rianalisi di ${c.name} avviata.`, 'ok');
+      await this.loadJobs();
+    } catch (e: unknown) {
+      const err = e as { error?: { detail?: string } };
+      this.showToast(err?.error?.detail ?? 'Impossibile rianalizzare il candidato.', 'err');
+    }
+  }
+
   hasFailed(j: Job): boolean {
     return (j.candidates ?? []).some((c) => c.status === 'error' || c.status === 'cancelled');
   }
