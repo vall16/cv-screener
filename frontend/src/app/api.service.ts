@@ -38,7 +38,7 @@ export interface Job {
   profile: string;
   cv_dir: string;
   session_id: string | null;
-  mode?: 'all' | 'new' | 'failed';
+  mode?: 'all' | 'new' | 'failed' | 'direct';
   cvs: string[];
   output: string[];
   error: string | null;
@@ -164,12 +164,14 @@ export class ApiService {
     profile: string,
     sessionId?: string,
     cvs?: string[],
-    mode: 'all' | 'new' | 'failed' = 'all',
+    mode: 'all' | 'new' | 'failed' | 'direct' = 'all',
+    workers?: number,
   ): Observable<JobResult> {
-    const body: { profile: string; session_id?: string; cvs?: string[]; mode?: string } = { profile };
+    const body: { profile: string; session_id?: string; cvs?: string[]; mode?: string; workers?: number } = { profile };
     if (sessionId) body.session_id = sessionId;
     if (cvs) body.cvs = cvs;
     if (mode !== 'all') body.mode = mode;
+    if (workers) body.workers = workers;
     return this.http.post<JobResult>(`${this.base}/api/jobs`, body);
   }
 

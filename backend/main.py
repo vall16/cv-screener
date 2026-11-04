@@ -234,6 +234,7 @@ class ScreeningReq(BaseModel):
     session_id: str | None = None
     cvs: list[str] | None = None
     mode: str = "all"
+    workers: int | None = None
 
 
 class CreateSessionReq(BaseModel):
@@ -264,11 +265,12 @@ def api_start_job(req: ScreeningReq):
                 session_id=req.session_id,
                 cv_names=cvs,
                 mode=req.mode,
+                workers=req.workers,
             )
         else:
             if not screener.list_cvs():
                 raise HTTPException(status_code=422, detail="Nessun CV presente nella cartella CVs")
-            job = screener.start_job(req.profile.strip(), mode=req.mode)
+            job = screener.start_job(req.profile.strip(), mode=req.mode, workers=req.workers)
     except (FileNotFoundError, ValueError) as e:
         raise HTTPException(status_code=422, detail=str(e))
     return {"job": job}

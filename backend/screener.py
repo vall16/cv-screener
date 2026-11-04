@@ -28,6 +28,18 @@ _MAX_OUTPUT_LINES = 500
 _procs: dict[str, list[subprocess.Popen]] = {}  # job_id -> processi qwen in corso
 
 
+def _env_int(name: str, default: int) -> int:
+    try:
+        return max(1, int(os.environ.get(name, default)))
+    except (TypeError, ValueError):
+        return default
+
+
+_SCREENING_WORKERS = _env_int("SCREENING_WORKERS", 3)
+_SCREENING_CV_TIMEOUT = _env_int("SCREENING_CV_TIMEOUT_SECONDS", 3600)
+_SCREENING_RETRY_ATTEMPTS = _env_int("SCREENING_RETRY_ATTEMPTS", 2)
+
+
 def _atomic_write(path: Path, data: str) -> None:
     """Scrivi in .tmp poi os.replace: se il processo muore a metà, il file originale resta intatto."""
     tmp = path.with_suffix(path.suffix + ".tmp")
@@ -931,7 +943,7 @@ def _resolve_cv_names(cv_names: list[str], folder: Path) -> list[str]:
     return resolved
 
 
-_VALID_MODES = {"all", "new", "failed"}
+_VALID_MODES = {"all", "new", "failed", "direct"}
 
 
 def _list_cv_files(folder: Path) -> list[str]:
@@ -998,7 +1010,7 @@ def _filter_cvs_by_mode(
     cv_names: list[str], session_id: str | None, mode: str
 ) -> list[str]:
     """Seleziona i CV da analizzare in base alla modalità richiesta."""
-    if mode == "all":
+    if mode in ("all", "direct"):
         return cv_names
     report_keys = _existing_report_keys(_report_dir_for(session_id))
     outcomes = _latest_cv_outcomes(session_id) if mode == "failed" else {}
@@ -1060,6 +1072,7 @@ def start_job(
     session_id: str | None = None,
     cv_names: list[str] | None = None,
     mode: str = "all",
+    workers: int | None = None,
 ) -> dict:
     folder = Path(cv_dir) if cv_dir else DEFAULT_CV_DIR
     folder.mkdir(parents=True, exist_ok=True)
@@ -1103,7 +1116,7 @@ def start_job(
         _save_jobs()
     threading.Thread(
         target=_run,
-        args=(job_id, profile, folder, session_id, cv_names, mode),
+        args=(job_id, profile, folder, session_id, cv_names, mode, workers),
         daemon=True,
     ).start()
     return job
@@ -1280,8 +1293,8 @@ def _run_qwen_with_retry(
 
 
 def _screening_mode() -> str:
-    """Modalità di screening: 'agent' (default, qwen headless) o 'direct' (chiamata API)."""
-    return os.environ.get("SCREENING_MODE", "agent").strip().lower()
+    """Modalità di screening: 'direct' (default, chiamata API) o 'agent' (qwen headless)."""
+    return os.environ.get("SCREENING_MODE", "direct").strip().lower()
 
 
 def _direct_config() -> dict:
@@ -1472,7 +1485,7 @@ def _run_single_cv(
             f"Non scrivere altri file: niente classifica.md, niente altre cartelle."
         )
         prompt = f"{instructions}\n\n{task}" if instructions else task
-        ok, err = _run_qwen_with_retry(job_id, prompt, attempts=2, timeout=3600)
+        ok, err = _run_qwen_with_retry(job_id, prompt, attempts=_SCREENING_RETRY_ATTEMPTS, timeout=_SCREENING_CV_TIMEOUT)
     if _is_cancelled(job_id):
         _record_candidate_timing(job_id, cv, None, started_ts, "cancelled", "annullato")
         return False, "annullato"
@@ -1566,6 +1579,7 @@ def _run(
     session_id: str | None = None,
     cv_names: list[str] | None = None,
     mode: str = "all",
+    workers: int | None = None,
 ) -> None:
     """Screening parallelo: più sessioni qwen contemporanee per CV, poi classifica finale."""
     report_dir = _report_dir_for(session_id)
@@ -1580,7 +1594,7 @@ def _run(
     total = len(cv_names)
     report_names = _assign_report_names(cv_names, report_dir)
     failed: list[str] = []
-    max_workers = min(3, total)
+    max_workers = min(workers or _SCREENING_WORKERS, total)
     mode_label = {"new": "solo nuovi", "failed": "solo falliti/non completati"}.get(mode)
     with _lock:
         if _jobs.get(job_id):

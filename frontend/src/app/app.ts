@@ -502,9 +502,14 @@ export class App implements OnInit, OnDestroy {
     this.newSessionCvs = [];
   }
 
+  // Modalità e concorrenza screening
+  screeningMode: 'all' | 'new' | 'failed' | 'direct' = 'direct';
+  screeningWorkers = 4;
+
   async startSessionScreening(
     s: Session,
-    mode: 'all' | 'new' | 'failed' = 'all',
+    mode: 'all' | 'new' | 'failed' | 'direct' = this.screeningMode,
+    workers: number = this.screeningWorkers,
   ): Promise<void> {
     if (!s.cvs.length) {
       this.showToast('La posizione non ha CV selezionati.', 'err');
@@ -513,7 +518,7 @@ export class App implements OnInit, OnDestroy {
     this.job = null;
     this.requestNotificationPermission();
     try {
-      const r = await firstValueFrom(this.api.startJob(s.profile, s.id, s.cvs, mode));
+      const r = await firstValueFrom(this.api.startJob(s.profile, s.id, s.cvs, mode, workers));
       this.job = r.job;
       this.step = 'run';
       this.startPolling();
