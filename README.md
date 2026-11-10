@@ -68,6 +68,12 @@ npm start                     # http://localhost:4200
 Apri <http://localhost:4200>, carica i CV, scrivi il profilo target e premi invio.
 I report compaiono nella sezione Report appena il job finisce.
 
+Lo screening avviene tramite chiamata API diretta a un endpoint LLM (default
+`http://192.168.1.145:11434/v1`, modello `qwen3.8-27b`, variabili
+`SCREENING_API_BASE` / `SCREENING_MODEL` / `SCREENING_API_KEY`). Non serve
+opencode installato a meno che non si voglia usare la modalità agente
+(`SCREENING_MODE=agent`).
+
 ### 3. (Opzionale) build di produzione
 
 Se compili il frontend, il backend lo serve da solo su `http://127.0.0.1:8000`:

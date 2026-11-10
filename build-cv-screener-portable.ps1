@@ -1,7 +1,7 @@
 #requires -Version 5.1
 <#
     Costruisce il pacchetto portable COMPLETO di CV Screener per un PC Windows:
-    backend, frontend gia' compilato, runtime Python, opencode e downloader Indeed.
+    backend, frontend gia' compilato, runtime Python e downloader Indeed.
 
     Contenuto prodotto in dist\:
       - cv-screener-portable\      (cartella pronta da usare)
@@ -12,13 +12,11 @@
 
     Opzioni:
       -SkipFrontend        non ricompila il frontend (usa frontend\dist esistente)
-      -OpencodeExe <path>  percorso di opencode.exe (default: installazione npm globale)
 #>
 [CmdletBinding()]
 param(
     [string]$PythonVersion = "3.11.9",
     [string]$OutDir = "",
-    [string]$OpencodeExe = "",
     [switch]$SkipFrontend
 )
 
@@ -50,17 +48,6 @@ Write-Host "==> Build $Name (Python $PythonVersion)"
 
 if (-not (Get-Command py -ErrorAction SilentlyContinue)) {
     throw "py launcher non trovato. Installa Python $pyTag e riprova."
-}
-
-if (-not $OpencodeExe) {
-    $candidates = @(
-        (Join-Path $env:APPDATA "npm\node_modules\opencode-ai\bin\opencode.exe"),
-        (Join-Path $env:LOCALAPPDATA "opencode\bin\opencode.exe")
-    )
-    $OpencodeExe = $candidates | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
-}
-if (-not $OpencodeExe -or -not (Test-Path $OpencodeExe)) {
-    throw "opencode.exe non trovato. Installalo (npm i -g opencode-ai) oppure passa -OpencodeExe <percorso>."
 }
 
 if (-not $SkipFrontend) {
@@ -135,12 +122,6 @@ $FeDst = Join-Path $Staging "frontend\dist\cv-screener"
 New-Item -ItemType Directory -Force -Path $FeDst | Out-Null
 Copy-Item $FrontendDist (Join-Path $FeDst "browser") -Recurse
 
-Write-Host "==> Agente opencode"
-New-Item -ItemType Directory -Force -Path (Join-Path $Staging ".opencode") | Out-Null
-Copy-Item (Join-Path $RepoRoot ".opencode\agent") (Join-Path $Staging ".opencode\agent") -Recurse
-Copy-Item (Join-Path $RepoRoot ".opencode\command") (Join-Path $Staging ".opencode\command") -Recurse
-Copy-Item (Join-Path $RepoRoot "opencode.json") $Staging
-
 Write-Host "==> Downloader Indeed"
 $IndeedDst = Join-Path $Staging "indeed-downloader"
 New-Item -ItemType Directory -Force -Path $IndeedDst | Out-Null
@@ -151,10 +132,8 @@ Copy-Item (Join-Path $RepoRoot "indeed-downloader\.env.example") (Join-Path $Ind
 New-Item -ItemType Directory -Force -Path (Join-Path $IndeedDst "downloads") | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $IndeedDst "logs") | Out-Null
 
-Write-Host "==> Dati e opencode"
+Write-Host "==> Dati"
 New-Item -ItemType Directory -Force -Path (Join-Path $Staging "CVs\_report") | Out-Null
-New-Item -ItemType Directory -Force -Path (Join-Path $Staging "bin") | Out-Null
-Copy-Item $OpencodeExe (Join-Path $Staging "bin\opencode.exe")
 
 $launcher = @'
 @echo off
@@ -163,7 +142,7 @@ title CV Screener
 cd /d "%~dp0"
 setlocal
 
-set "PATH=%~dp0bin;%~dp0python;%~dp0python\Scripts;%PATH%"
+set "PATH=%~dp0python;%~dp0python\Scripts;%PATH%"
 set "PYTHONUTF8=1"
 set "PYTHONIOENCODING=utf-8"
 set "PYTHONUNBUFFERED=1"
@@ -247,7 +226,9 @@ CV SCREENER - VERSIONE PORTABLE (WINDOWS)
 =========================================
 
 Non serve installare Python, Node.js o altri programmi: e' tutto in questa
-cartella. Servono solo Google Chrome e un account opencode.
+cartella. Servono solo Google Chrome (per il download Indeed) e un endpoint
+LLM raggiungibile (es. Ollama su `http://192.168.1.145:11434/v1`).
+Lo screening usa direttamente Qwen via API, non serve opencode.
 
 INSTALLAZIONE
 -------------
@@ -301,20 +282,17 @@ la finestra nera.
 PROBLEMI COMUNI
 ---------------
 - "Porta 8000 occupata": il launcher chiude l'istanza precedente.
-- Antivirus che blocca python.exe/opencode.exe: aggiungi la cartella alle
-  esclusioni.
+- Antivirus che blocca python.exe: aggiungi la cartella alle esclusioni.
 - Chrome non trovato: installa Chrome e accedi a Indeed almeno una volta.
-- Se lo screening si ferma con un errore di autenticazione o di modello,
-  apri una finestra nella cartella del programma e lancia:
-      bin\opencode.exe auth login
-  (oppure configura un provider e una API key in opencode.json).
-- Modello AI: e' impostato in opencode.json (opencode/big-pickle). Puoi
-  cambiarlo con un provider e una API key a tua scelta.
+- Se lo screening non parte, verifica che l'endpoint LLM (default
+  `http://192.168.1.145:11434/v1`) sia raggiungibile, oppure imposta le
+  variabili d'ambiente `SCREENING_API_BASE`, `SCREENING_MODEL`, `SCREENING_API_KEY`
+  prima di lanciare AVVIA-CV-SCREENER.cmd.
 
 PRIVACY
 -------
-I CV restano su questo PC e vengono inviati solo a opencode per l'analisi.
-Non condividere questa cartella: contiene i dati dei candidati.
+I CV restano su questo PC e vengono inviati solo all'endpoint LLM configurato
+per l'analisi. Non condividere questa cartella: contiene i dati dei candidati.
 '@
 Write-TextFile (Join-Path $Staging "LEGGIMI.txt") $readme -Bom
 
