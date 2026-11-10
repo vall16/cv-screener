@@ -128,9 +128,11 @@ Il tool [indeedBulkResumesDownloader](https://github.com/YasserLoukniti/indeedBu
 
 ### Da web UI
 
-1. Clicca **"Scarica da Indeed"** → si apre una finestra terminale
-2. Loggati su Indeed Employer
-3. Scegli: **1 - 1 - 2 - 4** (Backend, Tutti i job, Aperte + Sospese)
+1. Clicca **"Scarica da Indeed"** → si apre la finestra del downloader
+2. Loggati su Indeed Employer (solo la prima volta)
+3. Le scelte **1 - 1 - 2 - 4** (Backend, Tutti i job, Aperte + Sospese) sono
+   già precompilate in `indeed-downloader/.env.config`; per riavere il menu
+   interattivo basta togliere le righe `INDEED_*` da quel file
 4. Quando ha finito, clicca **"Sincronizza CV"** nella web UI
 
 ### Da terminale

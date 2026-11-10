@@ -280,9 +280,10 @@ Nota: la copia completa del profilo viene fatta solo a Chrome chiuso, perche'
 con Chrome aperto i file sono bloccati e la copia richiederebbe minuti senza
 portare a un risultato utilizzabile.
 
-Nel pannello, se compare un menu nel log, scegli: 1 - 1 - 2 - 4
-(English, Backend API, All jobs, Active+Paused). Se chiede il login,
-accedi nella finestra di Chrome e premi Invio.
+Le domande iniziali (English, Backend API, All jobs, Active+Paused = 1-1-2-4)
+sono gia' compilate in indeed-downloader\.env.config: non devi rispondere.
+Se compare "LOGIN REQUIRED", accedi a Indeed nella finestra di Chrome che si
+apre.
 
 Al termine usa "Sincronizza CV" nella web UI per importare i PDF scaricati.
 
