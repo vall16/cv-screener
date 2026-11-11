@@ -96,12 +96,19 @@ $pthContent = @(
 Write-Host "==> Dipendenze backend + downloader nel runtime"
 $sitePkgs = Join-Path $Staging "python\Lib\site-packages"
 New-Item -ItemType Directory -Force -Path $sitePkgs | Out-Null
+$embedPy = Join-Path $Staging "python\python.exe"
+$getPip = Join-Path $OutDir "get-pip.py"
+if (-not (Test-Path $getPip)) {
+    Invoke-WebRequest -Uri "https://bootstrap.pypa.io/get-pip.py" -OutFile $getPip -UseBasicParsing
+}
+& $embedPy $getPip --no-warn-script-location
+if ($LASTEXITCODE -ne 0) { throw "get-pip fallito (exit $LASTEXITCODE)" }
 $requirements = @(
     (Join-Path $RepoRoot "backend\requirements.txt"),
     (Join-Path $RepoRoot "indeed-downloader\requirements.txt")
 )
 foreach ($req in $requirements) {
-    & py "-$pyTag" -m pip install --disable-pip-version-check --ignore-installed `
+    & $embedPy -m pip install --disable-pip-version-check --ignore-installed `
         --no-warn-script-location --target "$sitePkgs" -r "$req"
     if ($LASTEXITCODE -ne 0) { throw "pip install fallito per $req (exit $LASTEXITCODE)" }
 }
