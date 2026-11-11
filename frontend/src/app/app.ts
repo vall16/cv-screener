@@ -1066,6 +1066,24 @@ export class App implements OnInit, OnDestroy {
     );
   }
 
+  onIndeedTerminalKeydown(event: KeyboardEvent): void {
+    const el = event.currentTarget as HTMLElement;
+    if (!el) return;
+    if (event.key === 'PageUp') {
+      event.preventDefault();
+      el.scrollTop -= el.clientHeight;
+    } else if (event.key === 'PageDown') {
+      event.preventDefault();
+      el.scrollTop += el.clientHeight;
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      el.scrollTop = 0;
+    } else if (event.key === 'End') {
+      event.preventDefault();
+      el.scrollTop = el.scrollHeight;
+    }
+  }
+
   async indeedSendInput(): Promise<void> {
     const text = this.indeedInputText;
     this.indeedInputText = '';

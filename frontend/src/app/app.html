@@ -782,7 +782,7 @@
       @if (!indeedRunning && indeedLines.length > 0) {
         <div class="banner info" style="margin:10px 16px 0;border-radius:8px">Processo terminato.</div>
       }
-      <div class="terminal" #indeedTerminal>
+      <div class="terminal" #indeedTerminal tabindex="0" (keydown)="onIndeedTerminalKeydown($event)">
         @for (line of indeedLines; track $index) {
           <div class="terminal-line" [class.echo]="line.startsWith('❯ ')">{{ line }}</div>
         }
